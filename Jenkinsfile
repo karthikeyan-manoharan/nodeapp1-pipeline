@@ -17,6 +17,7 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh 'npm install'
+                sh 'npm audit fix --force'
             }
         }
 
@@ -31,6 +32,9 @@ pipeline {
                         # Get latest stable ChromeDriver version
                         CHROMEDRIVER_VERSION=$(curl -sS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
                         echo "Latest stable ChromeDriver version: $CHROMEDRIVER_VERSION"
+                        
+                        # Create ChromeDriver directory if it doesn't exist
+                        mkdir -p ${CHROMEDRIVER_DIR}
                         
                         # Download and install ChromeDriver
                         wget -N -q "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
