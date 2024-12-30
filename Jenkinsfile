@@ -28,20 +28,29 @@ pipeline {
                     sudo apt-get remove -y google-chrome-stable || true
                     sudo apt-get purge -y google-chrome-stable || true
 
-                    # Install Chrome 114 (a stable version with available ChromeDriver)
-                    wget https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_114.0.5735.198-1_amd64.deb
-                    sudo dpkg -i google-chrome-stable_114.0.5735.198-1_amd64.deb || true
-                    sudo apt-get install -f -y
+                    # Add Google Chrome repository
+                    wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+                    sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+
+                    # Update package list again
+                    sudo apt-get update
+
+                    # Install the latest stable Chrome
+                    sudo apt-get install -y google-chrome-stable
+
+                    # Get Chrome version
+                    CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d. -f1-3)
 
                     # Install matching ChromeDriver
-                    wget https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip
+                    CHROMEDRIVER_VERSION=$(curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION)
+                    wget https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip
                     unzip chromedriver_linux64.zip
                     sudo mv chromedriver /usr/local/bin/
                     sudo chown root:root /usr/local/bin/chromedriver
                     sudo chmod +x /usr/local/bin/chromedriver
 
                     # Clean up
-                    rm google-chrome-stable_114.0.5735.198-1_amd64.deb chromedriver_linux64.zip
+                    rm chromedriver_linux64.zip
 
                     # Verify versions
                     google-chrome --version
