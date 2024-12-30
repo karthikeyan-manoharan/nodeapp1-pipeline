@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        CHROME_BIN = "/usr/bin/google-chrome"
+        CHROME_BIN = "/usr/bin/google-chrome-stable"
         CHROMEDRIVER_DIR = "${WORKSPACE}/chromedriver"
         CHROMEDRIVER_BIN = "${CHROMEDRIVER_DIR}/chromedriver"
     }
@@ -18,43 +18,12 @@ pipeline {
                 sh 'npm install'
             }
         }
-        stage('Install Chrome and ChromeDriver') {
+        stage('Install ChromeDriver') {
             steps {
                 script {
                     sh '''
-                        echo "Checking for Chrome installation..."
-                        
-                        # Check common locations for Chrome
-                        CHROME_FOUND=false
-                        for loc in "/usr/bin/google-chrome" "/usr/bin/google-chrome-stable" "/opt/google/chrome/google-chrome"; do
-                            if [ -x "$loc" ]; then
-                                echo "Chrome found at: $loc"
-                                export CHROME_BIN="$loc"
-                                CHROME_FOUND=true
-                                break
-                            fi
-                        done
-                        
-                        if [ "$CHROME_FOUND" = false ]; then
-                            echo "Chrome not found in common locations. Checking PATH..."
-                            if command -v google-chrome > /dev/null 2>&1; then
-                                CHROME_BIN=$(command -v google-chrome)
-                                echo "Chrome found in PATH: $CHROME_BIN"
-                                CHROME_FOUND=true
-                            elif command -v google-chrome-stable > /dev/null 2>&1; then
-                                CHROME_BIN=$(command -v google-chrome-stable)
-                                echo "Chrome found in PATH: $CHROME_BIN"
-                                CHROME_FOUND=true
-                            fi
-                        fi
-                        
-                        if [ "$CHROME_FOUND" = false ]; then
-                            echo "Chrome is not installed or not accessible. Please install Chrome manually."
-                            exit 1
-                        fi
-                        
                         # Get Chrome version
-                        CHROME_VERSION=$("$CHROME_BIN" --version | awk '{print $3}')
+                        CHROME_VERSION=$("${CHROME_BIN}" --version | awk '{print $3}')
                         echo "Chrome version: $CHROME_VERSION"
                         
                         # Install ChromeDriver
@@ -68,7 +37,7 @@ pipeline {
                         rm chromedriver_linux64.zip
                         
                         # Verify versions
-                        "$CHROME_BIN" --version
+                        "${CHROME_BIN}" --version
                         ${CHROMEDRIVER_BIN} --version
                     '''
                 }
