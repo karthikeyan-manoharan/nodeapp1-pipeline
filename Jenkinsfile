@@ -50,17 +50,9 @@ pipeline {
                 sh 'npm run test:coverage'
             }
         }
-        stage('Start Server and Run Selenium Tests') {
+        stage('Selenium Tests') {
             steps {
-                script {
-                    def serverProcess = sh(script: 'npm start &', returnStatus: true)
-                    sh 'sleep 10' // Wait for the server to start
-                    try {
-                        sh 'npm run test:selenium'
-                    } finally {
-                        sh 'pkill -f "node dist/server/index.js"'
-                    }
-                }
+                sh 'npm run test:selenium'
             }
         }
     }
