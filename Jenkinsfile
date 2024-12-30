@@ -19,12 +19,8 @@ pipeline {
                     wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
                     dpkg -x google-chrome-stable_current_amd64.deb chrome-linux
 
-                    # Get Chrome version
-                    CHROME_VERSION=$(./chrome-linux/opt/google/chrome/chrome --version | awk '{print $3}' | cut -d. -f1-3)
-
-                    # Install matching ChromeDriver
-                    CHROMEDRIVER_VERSION=$(curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION)
-                    wget https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip
+                    # Install ChromeDriver
+                    wget https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip
                     unzip chromedriver_linux64.zip
                     chmod +x chromedriver
 
@@ -61,6 +57,7 @@ pipeline {
             }
         }
     }
+
 
     post {
         success {
