@@ -30,13 +30,22 @@ pipeline {
                 script {
                     sh '''
                         CHROME_VERSION=$("${CHROME_BIN}" --version | awk '{print $3}')
+                        CHROME_MAJOR_VERSION=$(echo $CHROME_VERSION | cut -d. -f1)
                         echo "Chrome version: $CHROME_VERSION"
+                        echo "Chrome major version: $CHROME_MAJOR_VERSION"
                         
-                        CHROMEDRIVER_VERSION=$(npm ls chromedriver | grep chromedriver | awk '{print $2}' | sed 's/[^0-9.]//g')
-                        echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
+                        CHROMEDRIVER_VERSION=$(curl -sS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR_VERSION}")
+                        echo "Required ChromeDriver version: $CHROMEDRIVER_VERSION"
+                        
+                        INSTALLED_CHROMEDRIVER_VERSION=$(npm ls chromedriver | grep chromedriver | awk '{print $2}' | sed 's/[^0-9.]//g')
+                        echo "Installed ChromeDriver version: $INSTALLED_CHROMEDRIVER_VERSION"
+                        
+                        if [ "$CHROMEDRIVER_VERSION" != "$INSTALLED_CHROMEDRIVER_VERSION" ]; then
+                            echo "ChromeDriver version mismatch. Installing correct version..."
+                            npm install chromedriver@$CHROMEDRIVER_VERSION
+                        fi
                         
                         mkdir -p ${CHROMEDRIVER_DIR}
-                        
                         cp ./node_modules/chromedriver/lib/chromedriver/chromedriver ${CHROMEDRIVER_BIN}
                         chmod +x ${CHROMEDRIVER_BIN}
                         

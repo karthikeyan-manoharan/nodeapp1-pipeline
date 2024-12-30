@@ -9,9 +9,9 @@ beforeAll(async () => {
   options.addArguments('--no-sandbox');
   options.addArguments('--disable-dev-shm-usage');
 
-  // Use the CHROMEDRIVER_PATH environment variable
-  const chromeDriverPath = process.env.CHROMEDRIVER_PATH || '/usr/local/bin/chromedriver';
-  const service = new chrome.ServiceBuilder(chromeDriverPath);
+  // Use the CHROMEDRIVER_PATH environment variable if set, otherwise let Selenium manage it
+  const chromeDriverPath = process.env.CHROMEDRIVER_PATH;
+  const service = chromeDriverPath ? new chrome.ServiceBuilder(chromeDriverPath) : undefined;
 
   driver = await new Builder()
     .forBrowser('chrome')
@@ -21,7 +21,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await driver.quit();
+  if (driver) {
+    await driver.quit();
+  }
 });
 
 test('should open Google and search for "Selenium"', async () => {
