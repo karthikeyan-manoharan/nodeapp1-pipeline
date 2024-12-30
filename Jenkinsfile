@@ -16,8 +16,11 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'npm install'
-                sh 'npm audit fix --force'
+                sh '''
+                    npm install
+                    npm install selenium-webdriver @types/selenium-webdriver
+                    npm audit fix --force
+                '''
             }
         }
 
@@ -25,26 +28,20 @@ pipeline {
             steps {
                 script {
                     sh '''
-                        # Get Chrome version
                         CHROME_VERSION=$("${CHROME_BIN}" --version | awk '{print $3}')
                         echo "Chrome version: $CHROME_VERSION"
                         
-                        # Get latest stable ChromeDriver version
                         CHROMEDRIVER_VERSION=$(curl -sS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
                         echo "Latest stable ChromeDriver version: $CHROMEDRIVER_VERSION"
                         
-                        # Create ChromeDriver directory if it doesn't exist
                         mkdir -p ${CHROMEDRIVER_DIR}
                         
-                        # Download and install ChromeDriver
                         wget -N -q "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
                         unzip -o -q chromedriver_linux64.zip -d ${CHROMEDRIVER_DIR}
                         chmod +x ${CHROMEDRIVER_BIN}
                         
-                        # Clean up
                         rm chromedriver_linux64.zip
                         
-                        # Verify versions
                         echo "Installed Chrome version:"
                         "${CHROME_BIN}" --version
                         echo "Installed ChromeDriver version:"
