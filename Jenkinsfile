@@ -1,27 +1,87 @@
-const { Builder, Capabilities } = require('selenium-webdriver');
-const chrome = require('selenium-webdriver/chrome');
+pipeline {
+    agent any
 
-try {
-    console.log('Chrome binary path:', process.env.CHROME_BIN);
-    console.log('ChromeDriver path:', process.env.CHROMEDRIVER_PATH);
+    environment {
+        CHROME_BIN = "/usr/bin/google-chrome-stable"
+        CHROMEDRIVER_DIR = "${WORKSPACE}/chromedriver"
+        CHROMEDRIVER_BIN = "${CHROMEDRIVER_DIR}/chromedriver"
+    }
 
-    const options = new chrome.Options();
-    options.addArguments('--headless');
-    options.addArguments('--no-sandbox');
-    options.addArguments('--disable-dev-shm-usage');
-    options.setBinaryPath(process.env.CHROME_BIN);
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
 
-    const service = new chrome.ServiceBuilder(process.env.CHROMEDRIVER_PATH);
+        stage('Install Dependencies') {
+            steps {
+                sh 'npm install'
+            }
+        }
 
-    const driver = new Builder()
-        .forBrowser('chrome')
-        .setChromeOptions(options)
-        .setChromeService(service)
-        .build();
+        stage('Install ChromeDriver') {
+            steps {
+                script {
+                    sh '''
+                        # Get Chrome version
+                        CHROME_VERSION=$("${CHROME_BIN}" --version | awk '{print $3}')
+                        echo "Chrome version: $CHROME_VERSION"
+                        
+                        # Get latest stable ChromeDriver version
+                        CHROMEDRIVER_VERSION=$(curl -sS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
+                        echo "Latest stable ChromeDriver version: $CHROMEDRIVER_VERSION"
+                        
+                        # Download and install ChromeDriver
+                        wget -N -q "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
+                        unzip -o -q chromedriver_linux64.zip -d ${CHROMEDRIVER_DIR}
+                        chmod +x ${CHROMEDRIVER_BIN}
+                        
+                        # Clean up
+                        rm chromedriver_linux64.zip
+                        
+                        # Verify versions
+                        echo "Installed Chrome version:"
+                        "${CHROME_BIN}" --version
+                        echo "Installed ChromeDriver version:"
+                        ${CHROMEDRIVER_BIN} --version
+                    '''
+                }
+            }
+        }
 
-    // Your test code here
+        stage('Build') {
+            steps {
+                sh 'npm run build'
+            }
+        }
 
-} catch (error) {
-    console.error('Error setting up WebDriver:', error);
-    process.exit(1);
+        stage('Unit Tests') {
+            steps {
+                sh 'npm run test:coverage'
+            }
+        }
+
+        stage('Selenium Tests') {
+            steps {
+                sh '''
+                    export CHROME_BIN=${CHROME_BIN}
+                    export CHROMEDRIVER_PATH=${CHROMEDRIVER_BIN}
+                    npm run test:selenium
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline succeeded!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
 }
