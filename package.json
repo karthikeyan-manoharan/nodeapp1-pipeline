@@ -1,15 +1,15 @@
 {
-    "name": "reactjs-express-typescript-app",
-    "version": "1.0.0",
-    "main": "index.js",
-    "scripts": {
-        "test": "jest",
-        "test:coverage": "jest --coverage",
-        "build": "tsc",
-        "dev": "nodemon src/server/index.ts",
-        "start": "node dist/server/index.js",
-        "test:selenium": "concurrently --kill-others --success first \"npm start\" \"wait-on http://localhost:3000 && jest tests/selenium.test.ts\""
-    },
+  "name": "reactjs-express-typescript-app",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "build": "tsc",
+    "dev": "nodemon src/server/index.ts",
+    "start": "node dist/src/server/index.js",
+    "test:selenium": "concurrently --kill-others --success first \"npm start\" \"wait-on http://localhost:3000 && jest tests/selenium.test.ts\""
+  },
     "keywords": [],
     "author": "",
     "license": "ISC",
