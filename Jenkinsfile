@@ -15,16 +15,22 @@ pipeline {
         stage('Install Chrome and ChromeDriver') {
             steps {
                 sh '''
+                    # Wait for apt lock to be released
+                    while sudo lsof /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+                        echo "Waiting for apt lock to be released..."
+                        sleep 5
+                    done
+
                     # Update package list
                     sudo apt-get update
 
                     # Remove existing Chrome
-                    sudo apt-get remove -y google-chrome-stable
-                    sudo apt-get purge -y google-chrome-stable
+                    sudo apt-get remove -y google-chrome-stable || true
+                    sudo apt-get purge -y google-chrome-stable || true
 
                     # Install Chrome 114 (a stable version with available ChromeDriver)
                     wget https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_114.0.5735.198-1_amd64.deb
-                    sudo dpkg -i google-chrome-stable_114.0.5735.198-1_amd64.deb
+                    sudo dpkg -i google-chrome-stable_114.0.5735.198-1_amd64.deb || true
                     sudo apt-get install -f -y
 
                     # Install matching ChromeDriver
