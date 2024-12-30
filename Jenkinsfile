@@ -15,24 +15,30 @@ pipeline {
         stage('Install Chrome and ChromeDriver') {
             steps {
                 sh '''
-                    # Download and install Chrome
-                    wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-                    dpkg -x google-chrome-stable_current_amd64.deb chrome-linux
-
+                    # Add Google Chrome repository
+                    wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+                    sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+                    
+                    # Update package list and install Chrome
+                    sudo apt-get update
+                    sudo apt-get install -y google-chrome-stable
+                    
                     # Install ChromeDriver
-                    wget https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip
+                    CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d. -f1)
+                    CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
+                    wget -N "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
                     unzip chromedriver_linux64.zip
                     chmod +x chromedriver
-
+                    
                     # Clean up
-                    rm google-chrome-stable_current_amd64.deb chromedriver_linux64.zip
-
+                    rm chromedriver_linux64.zip
+                    
                     # Verify versions
-                    ./chrome-linux/opt/google/chrome/chrome --version
+                    google-chrome --version
                     ./chromedriver --version
-
+                    
                     # Set environment variables for Selenium tests
-                    export CHROME_BIN=./chrome-linux/opt/google/chrome/chrome
+                    export CHROME_BIN=$(which google-chrome)
                     export CHROMEDRIVER_PATH=$PWD/chromedriver
                 '''
             }
@@ -50,7 +56,7 @@ pipeline {
         stage('Selenium Tests') {
             steps {
                 sh '''
-                    export CHROME_BIN=./chrome-linux/opt/google/chrome/chrome
+                    export CHROME_BIN=$(which google-chrome)
                     export CHROMEDRIVER_PATH=$PWD/chromedriver
                     npm run test:selenium
                 '''
@@ -58,13 +64,12 @@ pipeline {
         }
     }
 
-
     post {
         success {
             echo 'Pipeline succeeded! The application is ready for deployment.'
         }
         failure {
-            echo 'Pipeline failed. Please check the console output to fix the issues.'
+            echo 'Pipeline failed. Please check the logs for details.'
         }
     }
 }
