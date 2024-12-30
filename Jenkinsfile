@@ -1,11 +1,6 @@
 pipeline {
     agent any
 
-    environment {
-        CHROME_VERSION = '114.0.5735.90'
-        CHROMEDRIVER_VERSION = '114.0.5735.90'
-    }
-
     stages {
         stage('Checkout') {
             steps {
@@ -21,16 +16,22 @@ pipeline {
             steps {
                 sh '''
                     # Download and install Chrome
-                    wget https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}-1_amd64.deb
-                    dpkg -x google-chrome-stable_${CHROME_VERSION}-1_amd64.deb $WORKSPACE/chrome
+                    wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+                    dpkg -x google-chrome-stable_current_amd64.deb $WORKSPACE/chrome
+                    
+                    # Get Chrome version
+                    CHROME_VERSION=$(${WORKSPACE}/chrome/opt/google/chrome/chrome --version | awk '{print $3}')
+                    echo "Chrome version: $CHROME_VERSION"
                     
                     # Install ChromeDriver
+                    CHROMEDRIVER_VERSION=$(curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION%%.*})
+                    echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
                     wget -N "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
                     unzip -o chromedriver_linux64.zip -d $WORKSPACE/chromedriver
                     chmod +x $WORKSPACE/chromedriver/chromedriver
                     
                     # Clean up
-                    rm google-chrome-stable_${CHROME_VERSION}-1_amd64.deb chromedriver_linux64.zip
+                    rm google-chrome-stable_current_amd64.deb chromedriver_linux64.zip
                     
                     # Verify versions
                     ${WORKSPACE}/chrome/opt/google/chrome/chrome --version
