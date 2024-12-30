@@ -1,13 +1,14 @@
 {
   "name": "reactjs-express-typescript-app",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/server/index.js",
   "scripts": {
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "build": "tsc",
-    "dev": "nodemon src/server/index.ts",
-    "start": "node dist/src/server/index.js",
+    "build": "tsc && npm run copy-public",
+    "copy-public": "mkdir -p dist/public && cp -r public/* dist/public/",
+    "dev": "ts-node-dev --respawn --transpile-only src/server/index.ts",
+    "start": "node dist/server/index.js",
     "test:selenium": "concurrently --kill-others --success first \"npm start\" \"wait-on http://localhost:3000 && jest tests/selenium.test.ts\""
   },
     "keywords": [],
