@@ -26,9 +26,15 @@ pipeline {
                         CHROME_VERSION=$("${CHROME_BIN}" --version | awk '{print $3}')
                         echo "Chrome version: $CHROME_VERSION"
                         
-                        # Install ChromeDriver
-                        CHROMEDRIVER_VERSION=$(curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION%%.*})
-                        echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
+                        # Get Chrome major version
+                        CHROME_MAJOR_VERSION=$(echo $CHROME_VERSION | cut -d. -f1)
+                        echo "Chrome major version: $CHROME_MAJOR_VERSION"
+                        
+                        # Find latest compatible ChromeDriver version
+                        CHROMEDRIVER_VERSION=$(curl -sS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR_VERSION}")
+                        echo "Compatible ChromeDriver version: $CHROMEDRIVER_VERSION"
+                        
+                        # Download and install ChromeDriver
                         wget -N -q "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
                         unzip -o -q chromedriver_linux64.zip -d ${CHROMEDRIVER_DIR}
                         chmod +x ${CHROMEDRIVER_BIN}
