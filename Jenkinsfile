@@ -1,3 +1,4 @@
+```groovy
 pipeline {
     agent any
 
@@ -7,9 +8,13 @@ pipeline {
                 checkout scm
             }
         }
-        stage('Build') {
+        stage('Install Dependencies') {
             steps {
                 sh 'npm install'
+            }
+        }
+        stage('Build') {
+            steps {
                 sh 'npm run build'
             }
         }
@@ -18,6 +23,14 @@ pipeline {
                 sh 'npm test'
             }
         }
-        // We'll add more stages later
+    }
+
+    post {
+        success {
+            echo 'Pipeline succeeded! The application is ready for deployment.'
+        }
+        failure {
+            echo 'Pipeline failed. Please check the console output to fix the issues.'
+        }
     }
 }
