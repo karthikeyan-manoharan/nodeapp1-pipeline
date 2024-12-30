@@ -1,33 +1,35 @@
 import { Builder, By, Key, until, WebDriver } from 'selenium-webdriver';
 import chrome from 'selenium-webdriver/chrome';
 
-let driver: WebDriver;
+describe('Selenium Test', () => {
+  let driver: WebDriver;
 
-beforeAll(async () => {
-  const options = new chrome.Options();
-  options.addArguments('--headless');
-  options.addArguments('--no-sandbox');
-  options.addArguments('--disable-dev-shm-usage');
+  beforeAll(async () => {
+    const chromeOptions = new chrome.Options();
+    chromeOptions.addArguments('--headless');
+    chromeOptions.addArguments('--no-sandbox');
+    chromeOptions.addArguments('--disable-dev-shm-usage');
 
-  // Use the CHROMEDRIVER_PATH environment variable if set, otherwise let Selenium manage it
-  const chromeDriverPath = process.env.CHROMEDRIVER_PATH;
-  const service = chromeDriverPath ? new chrome.ServiceBuilder(chromeDriverPath) : undefined;
+    if (process.env.CHROME_BIN) {
+      chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN);
+    }
 
-  driver = await new Builder()
-    .forBrowser('chrome')
-    .setChromeOptions(options)
-    .setChromeService(service)
-    .build();
-});
+    const service = new chrome.ServiceBuilder(process.env.CHROMEDRIVER_BIN);
 
-afterAll(async () => {
-  if (driver) {
+    driver = await new Builder()
+      .forBrowser('chrome')
+      .setChromeOptions(chromeOptions)
+      .setChromeService(service)
+      .build();
+  });
+
+  afterAll(async () => {
     await driver.quit();
-  }
-});
+  });
 
-test('should open Google and search for "Selenium"', async () => {
-  await driver.get('https://www.google.com');
-  await driver.findElement(By.name('q')).sendKeys('Selenium', Key.RETURN);
-  await driver.wait(until.titleIs('Selenium - Google Search'), 5000);
+  it('should load the homepage', async () => {
+    await driver.get('http://localhost:3000');
+    const title = await driver.getTitle();
+    expect(title).toBe('React App');
+  });
 });
