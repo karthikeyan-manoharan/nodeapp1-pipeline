@@ -1,5 +1,4 @@
 import { Builder, By, Key, until, WebDriver } from 'selenium-webdriver';
-import 'chromedriver';
 import chrome from 'selenium-webdriver/chrome';
 
 let driver: WebDriver;
@@ -10,12 +9,16 @@ beforeAll(async () => {
   options.addArguments('--no-sandbox');
   options.addArguments('--disable-dev-shm-usage');
 
+  // Use the CHROMEDRIVER_PATH environment variable
+  const chromeDriverPath = process.env.CHROMEDRIVER_PATH || '/usr/local/bin/chromedriver';
+  const service = new chrome.ServiceBuilder(chromeDriverPath);
+
   driver = await new Builder()
     .forBrowser('chrome')
     .setChromeOptions(options)
+    .setChromeService(service)
     .build();
 });
-
 
 afterAll(async () => {
   await driver.quit();

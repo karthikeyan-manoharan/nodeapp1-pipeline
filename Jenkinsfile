@@ -19,6 +19,7 @@ pipeline {
                 sh '''
                     npm install
                     npm install selenium-webdriver @types/selenium-webdriver
+                    npm install chromedriver
                     npm audit fix --force
                 '''
             }
@@ -31,16 +32,13 @@ pipeline {
                         CHROME_VERSION=$("${CHROME_BIN}" --version | awk '{print $3}')
                         echo "Chrome version: $CHROME_VERSION"
                         
-                        CHROMEDRIVER_VERSION=$(curl -sS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
-                        echo "Latest stable ChromeDriver version: $CHROMEDRIVER_VERSION"
+                        CHROMEDRIVER_VERSION=$(npm ls chromedriver | grep chromedriver | awk '{print $2}' | sed 's/[^0-9.]//g')
+                        echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
                         
                         mkdir -p ${CHROMEDRIVER_DIR}
                         
-                        wget -N -q "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
-                        unzip -o -q chromedriver_linux64.zip -d ${CHROMEDRIVER_DIR}
+                        cp ./node_modules/chromedriver/lib/chromedriver/chromedriver ${CHROMEDRIVER_BIN}
                         chmod +x ${CHROMEDRIVER_BIN}
-                        
-                        rm chromedriver_linux64.zip
                         
                         echo "Installed Chrome version:"
                         "${CHROME_BIN}" --version
