@@ -193,7 +193,7 @@ pipeline {
 					}
 				}
 			}
-		}
+			
 		stage('Delete Azure Resources') {
 		when {
 			branch 'develop'
@@ -227,7 +227,8 @@ pipeline {
 			}
 		}
 	}
-    post {
+		}
+		post {
         failure {
             script {
                 if (env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'false') {
