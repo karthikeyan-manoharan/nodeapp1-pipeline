@@ -28,6 +28,7 @@ pipeline {
                     wget -q -O chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}_amd64.deb
                     dpkg -x chrome.deb ${WORKSPACE}/chrome
                     ln -s ${WORKSPACE}/chrome/opt/google/chrome/chrome ${CHROME_BIN}
+                    
                     # Install ChromeDriver
                     mkdir -p ${CHROMEDRIVER_DIR}
                     wget -q -O chromedriver.zip https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip
@@ -35,6 +36,7 @@ pipeline {
                     mv ${CHROMEDRIVER_DIR}/chromedriver-linux64/chromedriver ${CHROMEDRIVER_BIN}
                     rm -rf ${CHROMEDRIVER_DIR}/chromedriver-linux64
                     chmod +x ${CHROMEDRIVER_BIN}
+                    
                     # Verify installed versions
                     echo "Installed Chrome version:"
                     ${CHROME_BIN} --version
@@ -61,7 +63,11 @@ pipeline {
                 sh '''
                     export CHROME_BIN=${CHROME_BIN}
                     export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
-                    npm run test
+                    export PATH=$PATH:${CHROMEDRIVER_DIR}
+                    echo "Chrome binary path: ${CHROME_BIN}"
+                    echo "ChromeDriver binary path: ${CHROMEDRIVER_BIN}"
+                    echo "PATH: $PATH"
+                    npm run test || (echo "Test failed. Printing error logs:"; cat selenium-debug.log; exit 1)
                     npm run test:coverage
                     npm run test:all
                 '''
