@@ -54,6 +54,17 @@ stage('Install Chrome and ChromeDriver') {
 
             echo "ChromeDriver version: ${CHROMEDRIVER_VERSION}"
             wget -q -O chromedriver.zip https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip
+            
+            # Remove existing chromedriver if it's a directory
+            if [ -d "${WORKSPACE}/chromedriver" ]; then
+                rm -rf "${WORKSPACE}/chromedriver"
+            fi
+            
+            # Remove existing chromedriver if it's a file
+            if [ -f "${WORKSPACE}/chromedriver" ]; then
+                rm "${WORKSPACE}/chromedriver"
+            fi
+            
             unzip -o chromedriver.zip -d ${WORKSPACE}
             chmod +x ${WORKSPACE}/chromedriver
 
