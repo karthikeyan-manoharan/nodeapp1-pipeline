@@ -1,7 +1,7 @@
-import { Builder, By, Key, until, WebDriver } from 'selenium-webdriver';
+import { Builder, By, until, WebDriver } from 'selenium-webdriver';
 import chrome from 'selenium-webdriver/chrome';
 
-const APP_URL = 'http://localhost:3000';
+const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 
 describe('Selenium Test', () => {
   let driver: WebDriver;
@@ -12,6 +12,7 @@ describe('Selenium Test', () => {
     chromeOptions.addArguments('--no-sandbox');
     chromeOptions.addArguments('--disable-dev-shm-usage');
 
+    // If running in Jenkins, you might need to specify the Chrome binary path
     if (process.env.CHROME_BIN) {
       chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN);
     }
@@ -20,15 +21,25 @@ describe('Selenium Test', () => {
       .forBrowser('chrome')
       .setChromeOptions(chromeOptions)
       .build();
-  });
+  }, 30000);
 
   afterAll(async () => {
-    await driver.quit();
+    if (driver) {
+      await driver.quit();
+    }
   });
 
   it('should load the homepage', async () => {
-    await driver.get(APP_URL);
-    const title = await driver.getTitle();
-    expect(title).toContain('React App'); // Adjust this based on your actual page title
-  });
+    try {
+      console.log(`Navigating to ${APP_URL}`);
+      await driver.get(APP_URL);
+      await driver.wait(until.titleMatches(/React App/i), 10000);
+      const title = await driver.getTitle();
+      console.log(`Page title: ${title}`);
+      expect(title).toMatch(/React App/i);
+    } catch (error) {
+      console.error('Error in test:', error);
+      throw error;
+    }
+  }, 30000);
 });
