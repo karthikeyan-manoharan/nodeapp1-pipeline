@@ -65,10 +65,13 @@ pipeline {
                 sh 'npm run build'
             }
         }
-        
-		 stage('Test') {
+		
+		
+		
+		stage('Start Application') {
 			steps {
-				sh '''
+				// Start the application
+					sh '''
 					set -x  # Enable verbose mode
 					export CHROME_BIN=${CHROME_BIN}
 					export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
@@ -84,9 +87,31 @@ pipeline {
 					echo "Application started with PID: $APP_PID"
 					# Wait for the application to start
 					sleep 10
-					# Run the tests
+					'''
+			}
+		}
+		
+		stage('Run Unit Tests') {
+			steps {
+				// Run npm run test
+					sh '''
 					npm run test || true
+					'''
+			}
+		}
+		
+		stage('Run Coverage Tests') {
+			steps {
+				// Run npm run test:coverage
+					sh '''
 					npm run test:coverage || true
+					'''
+			}
+		}
+		stage('Run Selenium Tests') {
+			steps {
+				// Run npm run test:selenium
+				sh '''
 					npm run test:selenium || true
 					# Kill the application process
 					if [ ! -z "$APP_PID" ]; then
@@ -96,6 +121,7 @@ pipeline {
 				'''
 			}
 		}
+		
         stage('Register Resource Providers') {
             when {
                 expression {
