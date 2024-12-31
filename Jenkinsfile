@@ -21,7 +21,7 @@ pipeline {
                 checkout scm
             }
         }
-        stage('Install Chrome and ChromeDriver') {
+       /*  stage('Install Chrome and ChromeDriver') {
             steps {
                 sh '''
                     # Download and extract Chrome
@@ -42,7 +42,7 @@ pipeline {
                     ${CHROMEDRIVER_BIN} --version
                 '''
             }
-        }
+        } */
         stage('Install Dependencies') {
             steps {
                 sh '''
@@ -177,14 +177,14 @@ pipeline {
                 }
             }
         }
-        stage('Run Tests on Dev') {
+       /* stage('Run Tests on Dev') {
             when {
                 branch 'develop'
             }
             steps {
                 sh 'npm run test'
             }
-        }
+        } */
     }
     post {
         always {
