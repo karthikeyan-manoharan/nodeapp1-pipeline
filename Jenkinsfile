@@ -44,12 +44,10 @@ pipeline {
         stage('Install Chrome and ChromeDriver') {
             steps {
                 sh '''
-                    # Download and extract Chrome
                     wget -q -O chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}_amd64.deb
                     dpkg -x chrome.deb ${WORKSPACE}/chrome
                     ln -s ${WORKSPACE}/chrome/opt/google/chrome/chrome ${CHROME_BIN}
                     
-                    # Install ChromeDriver
                     mkdir -p ${CHROMEDRIVER_DIR}
                     wget -q -O chromedriver.zip https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip
                     unzip -q -o chromedriver.zip -d ${CHROMEDRIVER_DIR}
@@ -57,7 +55,6 @@ pipeline {
                     rm -rf ${CHROMEDRIVER_DIR}/chromedriver-linux64
                     chmod +x ${CHROMEDRIVER_BIN}
                     
-                    # Verify installed versions
                     echo "Installed Chrome version:"
                     ${CHROME_BIN} --version
                     echo "Installed ChromeDriver version:"
@@ -68,7 +65,7 @@ pipeline {
         
         stage('Install Dependencies') {
             steps {
-                sh 'npm config set prefix /var/lib/jenkins/workspace/NodejsCIPipeline/.npm-global'
+                sh 'npm config set prefix ${NPM_CONFIG_PREFIX}'
                 sh 'npm install --no-fund'
                 sh 'npm install --save-dev selenium-webdriver @types/selenium-webdriver'
                 sh 'npm install -g concurrently wait-on start-server-and-test'
@@ -80,19 +77,21 @@ pipeline {
                 script {
                     try {
                         sh '''
-                            export CHROME_BIN=${WORKSPACE}/google-chrome
-                            export CHROMEDRIVER_BIN=${WORKSPACE}/chromedriver/chromedriver
+                            export CHROME_BIN=${CHROME_BIN}
+                            export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
                             npm run test:all
                         '''
                         echo "All tests passed"
+                        env.TESTS_SUCCESS = 'true'
                     } catch (Exception e) {
                         echo "Tests failed: ${e.getMessage()}"
-                        currentBuild.result = 'UNSTABLE'
+                        env.TESTS_SUCCESS = 'false'
+                        error "Tests failed"
                     }
                 }
             }
         }
-    
+        
         stage('Deploy to Dev') {
             when {
                 expression {
@@ -108,28 +107,20 @@ pipeline {
                             sh '''
                                 az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
                                 
-                                # Create Resource Group if it doesn't exist
                                 az group create --name ${AZURE_RESOURCE_GROUP} --location ${AZURE_LOCATION}
                                 
-                                # Create or update App Service Plan
                                 az appservice plan create --name ${AZURE_APP_PLAN} --resource-group ${AZURE_RESOURCE_GROUP} --sku ${AZURE_APP_SKU} --is-linux
                                 
-                                # Create or update Web App
-                                az webapp create --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --plan ${AZURE_APP_PLAN} --runtime "NODE:14-lts"
+                                az webapp create --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --plan ${AZURE_APP_PLAN} --runtime "NODE:16-lts"
                                 
-                                # Configure app settings
-                                az webapp config appsettings set --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --settings WEBSITE_NODE_DEFAULT_VERSION=14-lts
+                                az webapp config appsettings set --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --settings WEBSITE_NODE_DEFAULT_VERSION=16-lts
                                 
-                                # Configure web app
                                 az webapp config set --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --always-on true
                                 
-                                # Configure logging
                                 az webapp log config --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --web-server-logging filesystem
                                 
-                                # Deploy the dist.zip file
                                 az webapp deployment source config-zip --resource-group ${AZURE_RESOURCE_GROUP} --name ${AZURE_WEBAPP_NAME} --src dist.zip
                                 
-                                # Get and print the app URL
                                 APP_URL=$(az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv)
                                 echo "App URL: https://$APP_URL"
                             '''
@@ -144,6 +135,7 @@ pipeline {
                 }
             }
         }
+        
         stage('Run Automated Tests on Dev') {
             when {
                 expression {
@@ -152,37 +144,44 @@ pipeline {
             }
             steps {
                 script {
-                    echo "Starting automated tests on Dev"
                     try {
-                        sh """
-                            export APP_URL=https://${env.APP_URL}
-                            npm run test
-                            npm run test:coverage
-                            npm run test:selenium
-                        """
-                        env.TESTS_SUCCESS = 'true'
-                        echo "Automated tests on Dev passed"
+                        sh '''
+                            export CHROME_BIN=${CHROME_BIN}
+                            export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
+                            export APP_URL=${APP_URL}
+                            npm run test:e2e
+                        '''
+                        echo "All tests passed on Dev environment"
                     } catch (Exception e) {
-                        echo "Tests failed: ${e.getMessage()}"
-                        error "Tests failed"
+                        echo "Tests failed on Dev environment: ${e.getMessage()}"
+                        error "Tests failed on Dev environment"
                     }
                 }
             }
         }
+        
         stage('Manual Testing Approval') {
             when {
                 expression {
-                    return env.BRANCH_NAME == 'develop' &&
-                           env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true'
+                    return env.BRANCH_NAME == 'develop' && env.DEPLOYMENT_SUCCESS == 'true'
                 }
             }
             steps {
                 script {
-                    echo "Application is ready for manual testing at https://${env.APP_URL}"
-                    echo "Please perform your manual tests and approve or reject the deployment."
-                    
-                    timeout(time: 24, unit: 'HOURS') {
-                        input message: "Have you completed manual testing? (Application URL: https://${env.APP_URL})", ok: "Manual Testing Complete"
+                    def userInput = input(
+                        id: 'userInput',
+                        message: 'Do you want to proceed with manual testing?',
+                        parameters: [
+                            [$class: 'BooleanParameterDefinition', defaultValue: true, description: 'Proceed with manual testing?', name: 'PROCEED_MANUAL_TESTING']
+                        ]
+                    )
+                    if (userInput) {
+                        echo "Proceeding with manual testing. App URL: https://${env.APP_URL}"
+                        timeout(time: 1, unit: 'HOURS') {
+                            input message: "Manual testing completed? (App URL: https://${env.APP_URL})"
+                        }
+                    } else {
+                        echo "Manual testing skipped."
                     }
                 }
             }
@@ -191,65 +190,39 @@ pipeline {
         stage('Delete Azure Resources') {
             when {
                 expression {
-                    return env.BRANCH_NAME == 'develop' &&
-                           env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true'
+                    return env.BRANCH_NAME == 'develop' && env.DEPLOYMENT_SUCCESS == 'true'
                 }
             }
             steps {
                 script {
-                    echo "Starting Azure resource deletion process"
-                    try {
-                        timeout(time: 1, unit: 'HOURS') {
-                            input message: "Do you want to delete the Azure resources?", ok: "Yes, delete resources"
-                        }
+                    def userInput = input(
+                        id: 'deleteResources',
+                        message: 'Do you want to delete the Azure resources?',
+                        parameters: [
+                            [$class: 'BooleanParameterDefinition', defaultValue: false, description: 'Delete Azure resources?', name: 'DELETE_RESOURCES']
+                        ]
+                    )
+                    if (userInput) {
                         withCredentials([azureServicePrincipal('azure-credentials')]) {
                             sh '''
                                 az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                                
-                                # Delete the Web App
-                                az webapp delete --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP}
-                                
-                                # Delete the App Service Plan
-                                az appservice plan delete --name ${AZURE_APP_PLAN} --resource-group ${AZURE_RESOURCE_GROUP} --yes
-                                
-                                # Delete the Resource Group
                                 az group delete --name ${AZURE_RESOURCE_GROUP} --yes --no-wait
-                                
-                                echo "Azure resources deletion initiated"
                             '''
                         }
-                    } catch (Exception e) {
-                        echo "Resource deletion skipped or failed: ${e.getMessage()}"
+                        echo "Azure resources deletion initiated."
+                    } else {
+                        echo "Azure resources deletion skipped."
                     }
                 }
             }
         }
     }
+    
     post {
-        failure {
-            script {
-                if (env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'false') {
-                    echo "Tests failed, initiating rollback..."
-                    withCredentials([azureServicePrincipal('azure-credentials')]) {
-                        sh '''
-                            az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                            
-                            # Rollback to the previous deployment
-                            az webapp deployment slot swap --resource-group ${AZURE_RESOURCE_GROUP} --name ${AZURE_WEBAPP_NAME} --slot production --target-slot staging
-                            
-                            echo "Rollback completed"
-                        '''
-                    }
-                }
-                echo 'Pipeline failed!'
-            }
-        }
         always {
             withCredentials([azureServicePrincipal('azure-credentials')]) {
                 sh '''
                     az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                    
-                    # Get Azure cost for the day
                     COST=$(az consumption usage list --start-date $(date -d "today" '+%Y-%m-%d') --end-date $(date -d "tomorrow" '+%Y-%m-%d') --query "[].{Cost:pretaxCost}" -o tsv | awk '{sum += $1} END {print sum}')
                     echo "Today's Azure cost: $COST"
                 '''
@@ -257,7 +230,14 @@ pipeline {
             cleanWs()
         }
         success {
-            echo 'Pipeline succeeded!'
+            script {
+                echo "Pipeline completed successfully!"
+            }
+        }
+        failure {
+            script {
+                echo "Pipeline failed!"
+            }
         }
     }
 }
