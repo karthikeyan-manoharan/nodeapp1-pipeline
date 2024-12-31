@@ -25,71 +25,81 @@ pipeline {
 stage('Install Chrome and ChromeDriver') {
     steps {
         sh '''
-            # Download and extract Chrome
-            wget -q -O chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}_amd64.deb
+            wget -q -O chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_131.0.6778.204-1_amd64.deb
             dpkg -x chrome.deb ${WORKSPACE}/chrome
-            ln -s ${WORKSPACE}/chrome/opt/google/chrome/chrome ${CHROME_BIN}
+            if [ ! -L ${WORKSPACE}/google-chrome ]; then
+                ln -s ${WORKSPACE}/chrome/opt/google/chrome/chrome ${WORKSPACE}/google-chrome
+            else
+                echo "Symbolic link already exists, skipping creation."
+            fi
             
-            # Install ChromeDriver
-            mkdir -p ${CHROMEDRIVER_DIR}
-            wget -q -O chromedriver.zip https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip
-            unzip -q -o chromedriver.zip -d ${CHROMEDRIVER_DIR}
-            mv ${CHROMEDRIVER_DIR}/chromedriver-linux64/chromedriver ${CHROMEDRIVER_BIN}
-            rm -rf ${CHROMEDRIVER_DIR}/chromedriver-linux64
-            chmod +x ${CHROMEDRIVER_BIN}
+            # Download and setup ChromeDriver
+            CHROME_VERSION=$(${WORKSPACE}/google-chrome --version | awk '{ print $3 }' | awk -F'.' '{ print $1 }')
+            CHROMEDRIVER_VERSION=$(wget -qO- https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION})
+            wget -q -O chromedriver.zip https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip
+            unzip -o chromedriver.zip -d ${WORKSPACE}
+            chmod +x ${WORKSPACE}/chromedriver
             
-            # Verify installed versions
-            echo "Installed Chrome version:"
-            ${CHROME_BIN} --version
-            echo "Installed ChromeDriver version:"
-            ${CHROMEDRIVER_BIN} --version
+            # Set environment variables
+            echo "export CHROME_BIN=${WORKSPACE}/google-chrome" >> ${WORKSPACE}/env.sh
+            echo "export CHROMEDRIVER_BIN=${WORKSPACE}/chromedriver" >> ${WORKSPACE}/env.sh
+            echo "export PATH=\$PATH:${WORKSPACE}" >> ${WORKSPACE}/env.sh
         '''
     }
 }
         stage('Install Dependencies') {
             steps {
-                sh 'npm install'
-            }
-        }
-        stage('Build') {
-            steps {
-                sh 'npm run build'
-            }
-        }
-        stage('Start Application') {
-            steps {
                 sh '''
-                    npm run build
-                    nohup npm start &
-                    echo $! > .pidfile
-                    sleep 10  # Give the app some time to start
+                    source ${WORKSPACE}/env.sh
+                    npm install --no-fund
                 '''
             }
         }
-stage('Test') {
-    steps {
-        sh '''
-            export CHROME_BIN=${CHROME_BIN}
-            export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
-            export PATH=$PATH:${CHROMEDRIVER_DIR}
-            echo "Chrome binary path: ${CHROME_BIN}"
-            echo "ChromeDriver binary path: ${CHROMEDRIVER_BIN}"
-            echo "PATH: $PATH"
-            echo "Chrome version:"
-            ${CHROME_BIN} --version
-            echo "ChromeDriver version:"
-            ${CHROMEDRIVER_BIN} --version
-            echo "Node version:"
-            node --version
-            echo "NPM version:"
-            npm --version
-            echo "Selenium WebDriver version:"
-            npm list selenium-webdriver
-            echo "Running tests..."
-            npm run test:ci || (echo "Test failed. Printing error logs:"; find . -name "*.log" -type f -print0 | xargs -0 cat; exit 1)
-        '''
-    }
-}
+
+        stage('Build') {
+            steps {
+                sh '''
+                    source ${WORKSPACE}/env.sh
+                    npm run build
+                '''
+            }
+        }
+
+        stage('Start Application') {
+            steps {
+                sh '''
+                    source ${WORKSPACE}/env.sh
+                    npm run build
+                    nohup npm start &
+                    echo $! > .pidfile
+                    sleep 10
+                '''
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh '''
+                    source ${WORKSPACE}/env.sh
+                    echo "Chrome binary path: ${CHROME_BIN}"
+                    echo "ChromeDriver binary path: ${CHROMEDRIVER_BIN}"
+                    echo "PATH: $PATH"
+                    echo "Chrome version:"
+                    ${CHROME_BIN} --version
+                    echo "ChromeDriver version:"
+                    ${CHROMEDRIVER_BIN} --version
+                    echo "Node version:"
+                    node --version
+                    echo "NPM version:"
+                    npm --version
+                    echo "Selenium WebDriver version:"
+                    npm list selenium-webdriver
+                    echo "Running tests..."
+                    npm run test:ci || (echo "Test failed. Printing error logs:"; find . -name "*.log" -type f -print0 | xargs -0 cat; exit 1)
+                '''
+            }
+        }
+
         stage('Stop Application') {
             steps {
                 sh '''
