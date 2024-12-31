@@ -72,7 +72,7 @@ stage('Start Application') {
         script {
             try {
                 sh '''
-                    set -x  # Enable verbose mode
+                    set -x
                     export CHROME_BIN=${CHROME_BIN}
                     export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
                     
@@ -83,7 +83,7 @@ stage('Start Application') {
                         kill -9 $PORT_PID || true
                     fi
                     
-                    # Start the application
+                    # Start the application in the background
                     npm start &
                     APP_PID=$!
                     echo "Application started with PID: $APP_PID"
@@ -94,10 +94,11 @@ stage('Start Application') {
                             echo "Application is up and running"
                             exit 0
                         fi
-                        sleep 1
+                        echo "Waiting for application to start... (Attempt $i/30)"
+                        sleep 2
                     done
                     
-                    echo "Application failed to start within 30 seconds"
+                    echo "Application failed to start within 60 seconds"
                     exit 1
                 '''
             } catch (Exception e) {
