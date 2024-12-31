@@ -17,6 +17,7 @@ pipeline {
         
         DEPLOYMENT_SUCCESS = 'false'
         TESTS_SUCCESS = 'false'
+        APP_PID = ''
     }
     stages {
         stage('Checkout') {
@@ -24,6 +25,7 @@ pipeline {
                 checkout scm
             }
         }
+        
         stage('Install Chrome and ChromeDriver') {
             steps {
                 sh '''
@@ -31,6 +33,7 @@ pipeline {
                     wget -q -O chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}_amd64.deb
                     dpkg -x chrome.deb ${WORKSPACE}/chrome
                     ln -s ${WORKSPACE}/chrome/opt/google/chrome/chrome ${CHROME_BIN}
+                    
                     # Install ChromeDriver
                     mkdir -p ${CHROMEDRIVER_DIR}
                     wget -q -O chromedriver.zip https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip
@@ -38,6 +41,7 @@ pipeline {
                     mv ${CHROMEDRIVER_DIR}/chromedriver-linux64/chromedriver ${CHROMEDRIVER_BIN}
                     rm -rf ${CHROMEDRIVER_DIR}/chromedriver-linux64
                     chmod +x ${CHROMEDRIVER_BIN}
+                    
                     # Verify installed versions
                     echo "Installed Chrome version:"
                     ${CHROME_BIN} --version
@@ -46,6 +50,7 @@ pipeline {
                 '''
             }
         }
+        
         stage('Install Dependencies') {
             steps {
                 sh '''
@@ -54,26 +59,51 @@ pipeline {
                 '''
             }
         }
+        
         stage('Build') {
             steps {
                 sh 'npm run build'
             }
         }
+        
         stage('Test') {
             steps {
                 sh '''
                     export CHROME_BIN=${CHROME_BIN}
                     export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
+
+                    # Check if a process is running on port 3000 and kill it if it exists
+                    PORT_PID=$(lsof -t -i:3000 -sTCP:LISTEN)
+                    if [ ! -z "$PORT_PID" ]; then
+                        echo "Killing process on port 3000"
+                        kill -9 $PORT_PID
+                    fi
+
+                    # Start the application
+                    npm start &
+                    APP_PID=$!
+                    echo "Application started with PID: $APP_PID"
+
+                    # Wait for the application to start
+                    sleep 10
+
+                    # Run the tests
                     npm run test
                     npm run test:coverage
-                    # Commenting out Selenium tests for initial deployment
-                    # npm run test:selenium
+                    npm run test:selenium
+
+                    # Kill the application process
+                    if [ ! -z "$APP_PID" ]; then
+                        echo "Killing application process with PID: $APP_PID"
+                        kill -9 $APP_PID
+                    fi
                 '''
             }
         }
+        
         stage('Register Resource Providers') {
             when {
-                expression { 
+                expression {
                     return sh(script: 'az provider show -n Microsoft.Web --query "registrationState" -o tsv', returnStdout: true).trim() != "Registered"
                 }
             }
@@ -88,6 +118,7 @@ pipeline {
                 }
             }
         }
+        
         stage('Create or Update Azure Resources') {
             when {
                 branch 'develop'
@@ -119,6 +150,7 @@ pipeline {
                 }
             }
         }
+        
         stage('Deploy to Dev') {
             when {
                 branch 'develop'
@@ -151,6 +183,7 @@ pipeline {
                 }
             }
         }
+        
         stage('Run Automated Tests on Dev') {
             when {
                 branch 'develop'
@@ -164,8 +197,7 @@ pipeline {
                             export APP_URL=https://${env.APP_URL}
                             npm run test
                             npm run test:coverage
-                            # Commenting out Selenium tests for initial deployment
-                            # npm run test:selenium
+                            npm run test:selenium
                         """
                         env.TESTS_SUCCESS = 'true'
                     } catch (Exception e) {
@@ -175,6 +207,7 @@ pipeline {
                 }
             }
         }
+        
         stage('Manual Testing Approval') {
             when {
                 branch 'develop'
@@ -191,6 +224,7 @@ pipeline {
                 }
             }
         }
+        
         stage('Delete Azure Resources') {
             when {
                 branch 'develop'
@@ -233,23 +267,7 @@ pipeline {
                         '''
                     }
                 }
-                echo 'Pipeline failed!'
             }
         }
         always {
-            withCredentials([azureServicePrincipal('azure-credentials')]) {
-                sh '''
-                    az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                    
-                    # Get Azure cost for the day
-                    COST=$(az consumption usage list --start-date $(date -d "today" '+%Y-%m-%d') --end-date $(date -d "tomorrow" '+%Y-%m-%d') --query "[].{Cost:pretaxCost}" -o tsv | awk '{sum += $1} END {print sum}')
-                    echo "Today's Azure cost: $COST"
-                '''
-            }
-            cleanWs()
-        }
-        success {
-            echo 'Pipeline succeeded!'
-        }
-    }
-}
+            withCredentials([azureServicePrincipal('azure-
