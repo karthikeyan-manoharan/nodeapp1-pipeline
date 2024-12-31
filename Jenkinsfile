@@ -100,45 +100,38 @@ stage('Test') {
                 '''
             }
         }
-        stage('Debug') {
-            steps {
-                sh '''
-                    echo "Current directory contents:"
-                    ls -la
-                    echo "Node version:"
-                    node --version
-                    echo "NPM version:"
-                    npm --version
-                    echo "Selenium version:"
-                    npm list selenium-webdriver
-                    echo "ChromeDriver version in node_modules:"
-                    npm list chromedriver
-                '''
-            }
-        }
-        stage('Debug File Location') {
-            steps {
-                sh '''
-                    echo "Current working directory:"
-                    pwd
-                    echo "Contents of current directory:"
-                    ls -la
-                    echo "Contents of dist directory (if it exists):"
-                    ls -la dist || echo "dist directory does not exist"
-                '''
-            }
-        }
-        stage('Create Zip') {
-            steps {
-                sh '''
-                    npm run create-zip
-                    echo "Contents of current directory after zip creation:"
-                    ls -la
-                    echo "Location of dist.zip:"
-                    find . -name dist.zip
-                '''
-            }
-        }
+stage('Debug') {
+    steps {
+        sh '''
+            echo "Current directory contents:"
+            ls -la
+            echo "Node version:"
+            node --version
+            echo "NPM version:"
+            npm --version
+            echo "Selenium version:"
+            npm list selenium-webdriver
+            echo "ChromeDriver version in node_modules:"
+            npm list chromedriver
+            echo "Global ChromeDriver version:"
+            ${CHROMEDRIVER_BIN} --version
+        '''
+    }
+}
+stage('Debug File Location') {
+    steps {
+        sh 'pwd && ls -R'
+    }
+}
+stage('Create Zip') {
+    steps {
+        sh '''
+            echo "Creating zip file..."
+            zip -r dist.zip dist
+            echo "Zip file created successfully."
+        '''
+    }
+}
         stage('Register Resource Providers') {
             when {
                 expression {
