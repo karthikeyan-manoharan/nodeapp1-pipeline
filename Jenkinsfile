@@ -182,6 +182,7 @@ pipeline {
             }
         }
     }
+	
     post {
         always {
             withCredentials([azureServicePrincipal('azure-credentials')]) {
