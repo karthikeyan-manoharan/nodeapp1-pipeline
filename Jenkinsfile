@@ -95,9 +95,11 @@ stage('Start Application') {
                     echo "Checking Node.js processes:"
                     ps aux | grep node
                     echo "Checking port 3000 status:"
-                    lsof -i :3000 || echo "Port 3000 is not in use"
+                    netstat -tuln | grep :3000 || echo "Port 3000 is not in use"
                     echo "Displaying npm start output:"
                     cat npm-start.log
+                    echo "Attempting to curl the application:"
+                    curl -v http://localhost:3000
                     exit 1
                 '''
             } catch (Exception e) {
@@ -107,7 +109,7 @@ stage('Start Application') {
             }
         }
     }
-}	
+}
 		stage('Run Unit Tests') {
 			steps {
 				// Run npm run test
@@ -129,6 +131,11 @@ stage('Start Application') {
 			steps {
 				// Run npm run test:selenium
 				sh '''
+				
+				    set -x
+                    export CHROME_BIN=${CHROME_BIN}
+                    export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
+					
 					npm run test:selenium || true
 					# Kill the application process
 					if [ ! -z "$APP_PID" ]; then
