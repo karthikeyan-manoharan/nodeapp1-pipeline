@@ -79,6 +79,12 @@ stage('Test') {
             ${CHROME_BIN} --version
             echo "ChromeDriver version:"
             ${CHROMEDRIVER_BIN} --version
+            echo "Node version:"
+            node --version
+            echo "NPM version:"
+            npm --version
+            echo "Selenium WebDriver version:"
+            npm list selenium-webdriver
             echo "Running tests..."
             npm run test:ci || (echo "Test failed. Printing error logs:"; find . -name "*.log" -type f -print0 | xargs -0 cat; exit 1)
         '''

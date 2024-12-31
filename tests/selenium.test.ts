@@ -14,16 +14,14 @@ describe('Selenium Test', () => {
       options.setChromeBinaryPath(process.env.CHROME_BIN);
     }
 
-    let serviceBuilder;
+    let builder = new Builder().forBrowser('chrome').setChromeOptions(options);
+
     if (process.env.CHROMEDRIVER_BIN) {
-      serviceBuilder = new chrome.ServiceBuilder(process.env.CHROMEDRIVER_BIN);
+      const serviceBuilder = new chrome.ServiceBuilder(process.env.CHROMEDRIVER_BIN);
+      builder = builder.setChromeService(serviceBuilder);
     }
 
-    driver = await new Builder()
-      .forBrowser('chrome')
-      .setChromeOptions(options)
-      .setChromeService(serviceBuilder)
-      .build();
+    driver = await builder.build();
   }, 30000);
 
   afterAll(async () => {
