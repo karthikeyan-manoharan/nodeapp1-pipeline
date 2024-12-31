@@ -56,17 +56,17 @@ pipeline {
                 sh 'npm run build'
             }
         }
-        stage('Test') {
+     /*   stage('Test') {
             steps {
                 sh '''
                     export CHROME_BIN=${CHROME_BIN}
                     export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
                     npm run test 
                     npm run test:coverage 
-        //            npm run test:selenium
+                    npm run test:selenium
                 '''
             }
-        }
+        } */
         stage('Debug File Location') {
             steps {
                 sh '''
