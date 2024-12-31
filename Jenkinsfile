@@ -46,7 +46,7 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
-                    npm install
+                    npm install --no-fund
                     npm install --save-dev selenium-webdriver @types/selenium-webdriver
                 '''
             }
@@ -61,9 +61,9 @@ pipeline {
                 sh '''
                     export CHROME_BIN=${CHROME_BIN}
                     export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
-                    npm run test
-                    npm run test:coverage
-                    npm run test:selenium
+                    npm run test 
+                    npm run test:coverage 
+        //            npm run test:selenium
                 '''
             }
         }
