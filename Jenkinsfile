@@ -73,7 +73,27 @@ pipeline {
                 '''
             }
         }
-
+		
+		
+		
+		stage('Run All Tests') {
+            steps {
+                script {
+                    try {
+                        sh '''
+                            export CHROME_BIN=${WORKSPACE}/google-chrome
+                            export CHROMEDRIVER_BIN=${WORKSPACE}/chromedriver/chromedriver
+                            npm run test:all
+                        '''
+                        echo "All tests passed"
+                    } catch (Exception e) {
+                        echo "Tests failed: ${e.getMessage()}"
+                        currentBuild.result = 'UNSTABLE'
+                    }
+                }
+            }
+        }
+            /*
         stage('Run Tests') {
             parallel {
                 stage('Unit Tests') {
@@ -102,7 +122,7 @@ pipeline {
                         }
                     }
                 }
-              /*  stage('Selenium Tests') {
+             stage('Selenium Tests') {
                     steps {
                         script {
                             try {
@@ -119,7 +139,7 @@ pipeline {
                             }
                         }
                     }
-                } */ 
+                }  */
             }
          } 
         stage('Deploy to Dev') {

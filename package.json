@@ -10,7 +10,8 @@
     "create-zip": "bestzip dist.zip dist/*",
     "dev": "ts-node-dev --respawn --transpile-only src/server/index.ts",
     "start": "node dist/server/index.js > npm-start.log 2>&1",
-    "test:selenium": "concurrently --kill-others --success first \"npm start\" \"wait-on http://localhost:3000 && jest tests/selenium.test.ts\""
+    "test:selenium": "concurrently --kill-others --success first \"npm start\" \"wait-on http://localhost:3000 && jest tests/selenium.test.ts\"",
+    "test:all": "npm run build && start-server-and-test start http://localhost:3000 \"jest --runInBand\""
   },
   "keywords": [],
   "author": "",
