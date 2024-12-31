@@ -61,7 +61,7 @@ stage('Deploy to Azure App Service') {
                az webapp create --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --plan $AZURE_APP_PLAN --runtime "NODE:18-lts"
 
                 # Deploy the app
-                az webapp deployment source config-zip --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_WEBAPP_NAME --src "${WORKSPACE}/dist.zip"
+                az webapp deployment source config-zip --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_WEBAPP_NAME --src "${WORKSPACE}/NodejsCIPipeline/dist.zip"
             '''
         }
     }
