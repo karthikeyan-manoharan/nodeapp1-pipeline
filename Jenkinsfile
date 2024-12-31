@@ -73,8 +73,8 @@ pipeline {
         }
         stage('Register Resource Providers') {
             when {
-                expression {
-                     return sh(script: 'az provider show -n Microsoft.Web --query "registrationState" -o tsv', returnStdout: true).trim() != "Registered"
+                expression { 
+                    return sh(script: 'az provider show -n Microsoft.Web --query "registrationState" -o tsv', returnStdout: true).trim() != "Registered"
                 }
             }
             steps {
@@ -119,8 +119,6 @@ pipeline {
                 }
             }
         }
-
-
         stage('Deploy to Dev') {
             when {
                 branch 'develop'
@@ -153,7 +151,6 @@ pipeline {
                 }
             }
         }
-
         stage('Run Automated Tests on Dev') {
             when {
                 branch 'develop'
@@ -178,7 +175,6 @@ pipeline {
                 }
             }
         }
-
         stage('Manual Testing Approval') {
             when {
                 branch 'develop'
@@ -195,7 +191,6 @@ pipeline {
                 }
             }
         }
-
         stage('Delete Azure Resources') {
             when {
                 branch 'develop'
@@ -238,6 +233,7 @@ pipeline {
                         '''
                     }
                 }
+                echo 'Pipeline failed!'
             }
         }
         always {
@@ -254,9 +250,6 @@ pipeline {
         }
         success {
             echo 'Pipeline succeeded!'
-        }
-        failure {
-            echo 'Pipeline failed!'
         }
     }
 }
