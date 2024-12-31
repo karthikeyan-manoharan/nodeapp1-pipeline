@@ -22,29 +22,30 @@ pipeline {
                 checkout scm
             }
         }
-        stage('Install Chrome and ChromeDriver') {
-            steps {
-                sh '''
-                    # Download and extract Chrome
-                    wget -q -O chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}_amd64.deb
-                    dpkg -x chrome.deb ${WORKSPACE}/chrome
-                    ln -s ${WORKSPACE}/chrome/opt/google/chrome/chrome ${CHROME_BIN}
-                    
-                    # Install ChromeDriver
-                    mkdir -p ${CHROMEDRIVER_DIR}
-                    wget -q -O chromedriver.zip https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip
-                    unzip -q -o chromedriver.zip -d ${CHROMEDRIVER_DIR}
-                    chmod +x ${CHROMEDRIVER_BIN}
-                    
-                    # Verify installed versions
-                    echo "Installed Chrome version:"
-                    ${CHROME_BIN} --version
-                    echo "Installed ChromeDriver version:"
-                    ${CHROMEDRIVER_BIN} --version
-                '''
-            }
-        }
-        
+stage('Install Chrome and ChromeDriver') {
+    steps {
+        sh '''
+            # Download and extract Chrome
+            wget -q -O chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}_amd64.deb
+            dpkg -x chrome.deb ${WORKSPACE}/chrome
+            ln -s ${WORKSPACE}/chrome/opt/google/chrome/chrome ${CHROME_BIN}
+            
+            # Install ChromeDriver
+            mkdir -p ${CHROMEDRIVER_DIR}
+            wget -q -O chromedriver.zip https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip
+            unzip -q -o chromedriver.zip -d ${CHROMEDRIVER_DIR}
+            mv ${CHROMEDRIVER_DIR}/chromedriver-linux64/chromedriver ${CHROMEDRIVER_BIN}
+            rm -rf ${CHROMEDRIVER_DIR}/chromedriver-linux64
+            chmod +x ${CHROMEDRIVER_BIN}
+            
+            # Verify installed versions
+            echo "Installed Chrome version:"
+            ${CHROME_BIN} --version
+            echo "Installed ChromeDriver version:"
+            ${CHROMEDRIVER_BIN} --version
+        '''
+    }
+}
         stage('Install Dependencies') {
             steps {
                 sh 'npm install'
