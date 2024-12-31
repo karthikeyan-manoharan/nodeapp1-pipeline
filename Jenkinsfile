@@ -22,71 +22,71 @@ pipeline {
                 checkout scm
             }
         }
-stage('Install Chrome and ChromeDriver') {
-    steps {
-        sh '''
-            set -e  # Exit immediately if a command exits with a non-zero status
+        stage('Install Chrome and ChromeDriver') {
+            steps {
+                sh '''
+                    set -e  # Exit immediately if a command exits with a non-zero status
 
-            # Install Chrome
-            wget -q -O chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_131.0.6778.204-1_amd64.deb
-            dpkg -x chrome.deb ${WORKSPACE}/chrome
-            if [ ! -L ${WORKSPACE}/google-chrome ]; then
-                ln -s ${WORKSPACE}/chrome/opt/google/chrome/chrome ${WORKSPACE}/google-chrome
-            else
-                echo "Symbolic link already exists, skipping creation."
-            fi
+                    # Install Chrome
+                    wget -q -O chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_131.0.6778.204-1_amd64.deb
+                    dpkg -x chrome.deb ${WORKSPACE}/chrome
+                    if [ ! -L ${WORKSPACE}/google-chrome ]; then
+                        ln -s ${WORKSPACE}/chrome/opt/google/chrome/chrome ${WORKSPACE}/google-chrome
+                    else
+                        echo "Symbolic link already exists, skipping creation."
+                    fi
 
-            # Get Chrome version
-            CHROME_VERSION=$(${WORKSPACE}/google-chrome --version | awk '{ print $3 }' | awk -F. '{ print $1 }')
-            echo "Chrome version: ${CHROME_VERSION}"
+                    # Get Chrome version
+                    CHROME_VERSION=$(${WORKSPACE}/google-chrome --version | awk '{ print $3 }' | awk -F. '{ print $1 }')
+                    echo "Chrome version: ${CHROME_VERSION}"
 
-            # Download and setup ChromeDriver
-            CHROMEDRIVER_VERSION=$(wget -qO- https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION} || echo "")
-            if [ -z "${CHROMEDRIVER_VERSION}" ]; then
-                echo "Failed to retrieve ChromeDriver version. Using latest version."
-                CHROMEDRIVER_VERSION=$(wget -qO- https://chromedriver.storage.googleapis.com/LATEST_RELEASE || echo "")
-            fi
+                    # Download and setup ChromeDriver
+                    CHROMEDRIVER_VERSION=$(wget -qO- https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION} || echo "")
+                    if [ -z "${CHROMEDRIVER_VERSION}" ]; then
+                        echo "Failed to retrieve ChromeDriver version. Using latest version."
+                        CHROMEDRIVER_VERSION=$(wget -qO- https://chromedriver.storage.googleapis.com/LATEST_RELEASE || echo "")
+                    fi
 
-            if [ -z "${CHROMEDRIVER_VERSION}" ]; then
-                echo "Failed to retrieve ChromeDriver version. Exiting."
-                exit 1
-            fi
+                    if [ -z "${CHROMEDRIVER_VERSION}" ]; then
+                        echo "Failed to retrieve ChromeDriver version. Exiting."
+                        exit 1
+                    fi
 
-            echo "ChromeDriver version: ${CHROMEDRIVER_VERSION}"
-            wget -q -O chromedriver.zip https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip
-            
-            # Remove existing chromedriver if it's a directory
-            if [ -d "${WORKSPACE}/chromedriver" ]; then
-                rm -rf "${WORKSPACE}/chromedriver"
-            fi
-            
-            # Remove existing chromedriver if it's a file
-            if [ -f "${WORKSPACE}/chromedriver" ]; then
-                rm "${WORKSPACE}/chromedriver"
-            fi
-            
-            unzip -o chromedriver.zip -d ${WORKSPACE}
-            chmod +x ${WORKSPACE}/chromedriver
+                    echo "ChromeDriver version: ${CHROMEDRIVER_VERSION}"
+                    wget -q -O chromedriver.zip https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip
+                    
+                    # Remove existing chromedriver if it's a directory
+                    if [ -d "${WORKSPACE}/chromedriver" ]; then
+                        rm -rf "${WORKSPACE}/chromedriver"
+                    fi
+                    
+                    # Remove existing chromedriver if it's a file
+                    if [ -f "${WORKSPACE}/chromedriver" ]; then
+                        rm "${WORKSPACE}/chromedriver"
+                    fi
+                    
+                    unzip -o chromedriver.zip -d ${WORKSPACE}
+                    chmod +x ${WORKSPACE}/chromedriver
 
-            # Set environment variables
-            echo "export CHROME_BIN=${WORKSPACE}/google-chrome" > ${WORKSPACE}/env.sh
-            echo "export CHROMEDRIVER_BIN=${WORKSPACE}/chromedriver" >> ${WORKSPACE}/env.sh
-            echo "export PATH=\$PATH:${WORKSPACE}" >> ${WORKSPACE}/env.sh
+                    # Set environment variables
+                    echo "export CHROME_BIN=${WORKSPACE}/google-chrome" > ${WORKSPACE}/env.sh
+                    echo "export CHROMEDRIVER_BIN=${WORKSPACE}/chromedriver" >> ${WORKSPACE}/env.sh
+                    echo "export PATH=\$PATH:${WORKSPACE}" >> ${WORKSPACE}/env.sh
 
-            # Print versions for verification
-            echo "Chrome version:"
-            ${WORKSPACE}/google-chrome --version
-            echo "ChromeDriver version:"
-            ${WORKSPACE}/chromedriver --version
-        '''
-    }
-}
-       
+                    # Print versions for verification
+                    echo "Chrome version:"
+                    ${WORKSPACE}/google-chrome --version
+                    echo "ChromeDriver version:"
+                    ${WORKSPACE}/chromedriver --version
+                '''
+            }
+        }
+
         stage('Install Dependencies') {
             steps {
                 sh '''
-                    source ${WORKSPACE}/env.sh
-                    npm install
+                    . ${WORKSPACE}/env.sh
+                    npm install --no-fund
                 '''
             }
         }
@@ -94,7 +94,7 @@ stage('Install Chrome and ChromeDriver') {
         stage('Build') {
             steps {
                 sh '''
-                    source ${WORKSPACE}/env.sh
+                    . ${WORKSPACE}/env.sh
                     npm run build
                 '''
             }
@@ -103,7 +103,7 @@ stage('Install Chrome and ChromeDriver') {
         stage('Start Application') {
             steps {
                 sh '''
-                    source ${WORKSPACE}/env.sh
+                    . ${WORKSPACE}/env.sh
                     npm run build
                     nohup npm start &
                     echo $! > .pidfile
@@ -115,7 +115,7 @@ stage('Install Chrome and ChromeDriver') {
         stage('Test') {
             steps {
                 sh '''
-                    source ${WORKSPACE}/env.sh
+                    . ${WORKSPACE}/env.sh
                     echo "Chrome binary path: ${CHROME_BIN}"
                     echo "ChromeDriver binary path: ${CHROMEDRIVER_BIN}"
                     echo "PATH: $PATH"
@@ -134,6 +134,7 @@ stage('Install Chrome and ChromeDriver') {
                 '''
             }
         }
+
 
         stage('Stop Application') {
             steps {
