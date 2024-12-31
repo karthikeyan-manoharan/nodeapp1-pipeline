@@ -41,7 +41,9 @@ stage('Deploy to Azure App Service') {
                 ls -la
                 
                 # Copy dist.zip to a Windows-accessible location
-                cp dist.zip /mnt/c/dist.zip
+				
+			
+                cp dist.zip /mnt/c/FRESH/PLAN/PROJECTS/deployments/dist.zip
                 
                 # Login to Azure
                 az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
@@ -57,10 +59,10 @@ stage('Deploy to Azure App Service') {
                 az webapp create --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --plan $AZURE_APP_PLAN --runtime "NODE:18-lts"
 
                 # Deploy the app using the Windows path
-                az webapp deployment source config-zip --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_WEBAPP_NAME --src "C:\\dist.zip"
+                az webapp deployment source config-zip --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_WEBAPP_NAME --src "C:\\FRESH\\PLAN\\PROJECTS\\deployments\\dist.zip"
                 
                 # Clean up
-                rm /mnt/c/dist.zip
+                rm /mnt/c/FRESH/PLAN/PROJECTS/deployments/dist.zip
             '''
         }
     }
