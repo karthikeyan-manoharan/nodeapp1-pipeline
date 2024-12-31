@@ -95,7 +95,7 @@ stage('Start Application') {
                     echo "Checking Node.js processes:"
                     ps aux | grep node
                     echo "Checking port 3000 status:"
-                    lsof -i :3000 || echo "Port 3000 is still free"
+                    lsof -i :3000 || echo "Port 3000 is not in use"
                     echo "Displaying npm start output:"
                     cat npm-start.log
                     exit 1
