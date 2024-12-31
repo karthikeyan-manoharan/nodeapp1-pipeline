@@ -27,13 +27,12 @@ pipeline {
                 sh 'echo $BRANCH_NAME'
             }
         }
-
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
-		
+        
         stage('Install Chrome and ChromeDriver') {
             steps {
                 sh '''
@@ -73,8 +72,8 @@ pipeline {
                 sh 'npm run build --no-fund'
             }
         }
-        
-      stage('Run Tests') {
+      
+        stage('Run Tests') {
             parallel {
                 stage('Unit Tests') {
                     steps {
@@ -110,25 +109,8 @@ pipeline {
                                     set -x
                                     export CHROME_BIN=${CHROME_BIN}
                                     export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
-                                    npm start &
-                                    APP_PID=$!
-                                    echo "Application started with PID: $APP_PID"
-                                    
-                                    # Wait for the application to start
-                                    for i in {1..30}; do
-                                        if curl -s http://localhost:3000 > /dev/null; then
-                                            echo "Application is up and running"
-                                            break
-                                        fi
-                                        echo "Waiting for application to start... (Attempt $i/30)"
-                                        sleep 2
-                                    done
-                                    
-                                    npm run test:selenium
-                                    TEST_EXIT_CODE=$?
-                                    
-                                    kill $APP_PID
-                                    exit $TEST_EXIT_CODE
+                                    npm install -g concurrently wait-on
+                                    concurrently --kill-others --success first "npm start" "wait-on http://localhost:3000 && jest tests/selenium.test.ts"
                                 '''
                                 echo "Selenium tests passed"
                             } catch (Exception e) {
