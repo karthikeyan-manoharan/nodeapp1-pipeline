@@ -1,3 +1,4 @@
+pipeline {
     agent any
     environment {
         CHROME_VERSION = "131.0.6778.204-1"
@@ -13,6 +14,9 @@
         AZURE_APP_SKU = 'B1'
         
         GITHUB_REPO_URL = 'https://github.com/karthikeyan-manoharan/reactjs-express-typescript-app.git'
+        
+        DEPLOYMENT_SUCCESS = 'false'
+        TESTS_SUCCESS = 'false'
     }
     stages {
         stage('Checkout') {
@@ -115,53 +119,127 @@
                 }
             }
         }
+
+
         stage('Deploy to Dev') {
             when {
                 branch 'develop'
             }
             steps {
-                withCredentials([azureServicePrincipal('azure-credentials')]) {
-                    sh '''
-                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                        
-                        # Deploy the dist.zip file
-                        az webapp deployment source config-zip --resource-group ${AZURE_RESOURCE_GROUP} --name ${AZURE_WEBAPP_NAME} --src dist.zip
-                        
-                        # Get and print the deployment logs
-                        az webapp log download --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --log-file webapp_logs.zip
-                        unzip -p webapp_logs.zip
-                        
-                        # Get and print the app URL
-                        APP_URL=$(az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv)
-                        echo "App URL: https://$APP_URL"
-                    '''
+                script {
+                    try {
+                        withCredentials([azureServicePrincipal('azure-credentials')]) {
+                            sh '''
+                                az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                                
+                                # Deploy the dist.zip file
+                                az webapp deployment source config-zip --resource-group ${AZURE_RESOURCE_GROUP} --name ${AZURE_WEBAPP_NAME} --src dist.zip
+                                
+                                # Get and print the deployment logs
+                                az webapp log download --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --log-file webapp_logs.zip
+                                unzip -p webapp_logs.zip
+                                
+                                # Get and print the app URL
+                                APP_URL=$(az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv)
+                                echo "App URL: https://$APP_URL"
+                            '''
+                            env.DEPLOYMENT_SUCCESS = 'true'
+                            env.APP_URL = sh(script: 'az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv', returnStdout: true).trim()
+                        }
+                    } catch (Exception e) {
+                        echo "Deployment failed: ${e.getMessage()}"
+                        error "Deployment failed"
+                    }
                 }
             }
         }
-        stage('Run Tests on Dev') {
+
+        stage('Run Automated Tests on Dev') {
             when {
                 branch 'develop'
+                expression { env.DEPLOYMENT_SUCCESS == 'true' }
             }
             steps {
                 script {
-                    def appUrl = sh(script: '''
-                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                        az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv
-                    ''', returnStdout: true).trim()
+                    try {
+                        // Run tests against the deployed app
+                        sh """
+                            export APP_URL=https://${env.APP_URL}
+                            npm run test
+                            npm run test:coverage
+                            # Commenting out Selenium tests for initial deployment
+                            # npm run test:selenium
+                        """
+                        env.TESTS_SUCCESS = 'true'
+                    } catch (Exception e) {
+                        echo "Tests failed: ${e.getMessage()}"
+                        error "Tests failed"
+                    }
+                }
+            }
+        }
+
+        stage('Manual Testing Approval') {
+            when {
+                branch 'develop'
+                expression { env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true' }
+            }
+            steps {
+                script {
+                    echo "Application is ready for manual testing at https://${env.APP_URL}"
+                    echo "Please perform your manual tests and approve or reject the deployment."
                     
-                    // Run tests against the deployed app
-                    sh """
-                        export APP_URL=https://${appUrl}
-                        npm run test
-                        npm run test:coverage
-                        # Commenting out Selenium tests for initial deployment
-                        # npm run test:selenium
-                    """
+                    timeout(time: 24, unit: 'HOURS') {
+                        input message: "Have you completed manual testing? (Application URL: https://${env.APP_URL})", ok: "Manual Testing Complete"
+                    }
+                }
+            }
+        }
+
+        stage('Delete Azure Resources') {
+            when {
+                branch 'develop'
+                expression { env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true' }
+            }
+            steps {
+                script {
+                    try {
+                        withCredentials([azureServicePrincipal('azure-credentials')]) {
+                            sh '''
+                                az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                                
+                                # Delete the resource group and all resources within it
+                                az group delete --name ${AZURE_RESOURCE_GROUP} --yes --no-wait
+                                
+                                echo "Resource group ${AZURE_RESOURCE_GROUP} deletion initiated"
+                            '''
+                        }
+                    } catch (Exception e) {
+                        echo "Resource deletion failed: ${e.getMessage()}"
+                        error "Resource deletion failed"
+                    }
                 }
             }
         }
     }
     post {
+        failure {
+            script {
+                if (env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'false') {
+                    echo "Tests failed, initiating rollback..."
+                    withCredentials([azureServicePrincipal('azure-credentials')]) {
+                        sh '''
+                            az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                            
+                            # Rollback to the previous deployment
+                            az webapp deployment slot swap --resource-group ${AZURE_RESOURCE_GROUP} --name ${AZURE_WEBAPP_NAME} --slot production --target-slot staging
+                            
+                            echo "Rollback completed"
+                        '''
+                    }
+                }
+            }
+        }
         always {
             withCredentials([azureServicePrincipal('azure-credentials')]) {
                 sh '''
