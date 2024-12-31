@@ -30,29 +30,29 @@ pipeline {
 		
     
 
-        stage('Deploy to Azure App Service') {
-            steps {
-                withCredentials([azureServicePrincipal('azure-credentials')]) {
-                    sh '''
-                        echo "Deploying to Azure App Service..."
-                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                        az account set --subscription $AZURE_SUBSCRIPTION_ID
-                        
-                        # Create resource group if it doesn't exist
-                        az group create --name $AZURE_RESOURCE_GROUP --location $AZURE_LOCATION
+stage('Deploy to Azure App Service') {
+    steps {
+        withCredentials([azureServicePrincipal('azure-credentials')]) {
+            sh '''
+                echo "Deploying to Azure App Service..."
+                az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                az account set --subscription $AZURE_SUBSCRIPTION_ID
+                
+                # Create resource group if it doesn't exist
+                az group create --name $AZURE_RESOURCE_GROUP --location $AZURE_LOCATION
 
-                        # Create App Service plan if it doesn't exist
-                        az appservice plan create --name $AZURE_APP_PLAN --resource-group $AZURE_RESOURCE_GROUP --sku $AZURE_APP_SKU --is-linux
+                # Create App Service plan if it doesn't exist
+                az appservice plan create --name $AZURE_APP_PLAN --resource-group $AZURE_RESOURCE_GROUP --sku $AZURE_APP_SKU --is-linux
 
-                        # Create or update the web app
-                        az webapp create --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --plan $AZURE_APP_PLAN --runtime "NODE|16-lts"
+                # Create or update the web app
+                az webapp create --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --plan $AZURE_APP_PLAN --runtime "NODE|18-lts"
 
-                        # Deploy the app
-                        az webapp deployment source config-zip --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_WEBAPP_NAME --src dist.zip
-                    '''
-                }
-            }
+                # Deploy the app
+                az webapp deployment source config-zip --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_WEBAPP_NAME --src dist.zip
+            '''
         }
+    }
+}
 
         stage('Manual Testing Approval') {
             steps {
