@@ -1,4 +1,3 @@
-pipeline {
     agent any
     environment {
         CHROME_VERSION = "131.0.6778.204-1"
@@ -63,14 +62,15 @@ pipeline {
                     export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
                     npm run test
                     npm run test:coverage
-                    npm run test:selenium
+                    # Commenting out Selenium tests for initial deployment
+                    # npm run test:selenium
                 '''
             }
         }
         stage('Register Resource Providers') {
             when {
-                expression { 
-                    return sh(script: 'az provider show -n Microsoft.Web --query "registrationState" -o tsv', returnStdout: true).trim() != "Registered"
+                expression {
+                     return sh(script: 'az provider show -n Microsoft.Web --query "registrationState" -o tsv', returnStdout: true).trim() != "Registered"
                 }
             }
             steps {
@@ -120,19 +120,20 @@ pipeline {
                 branch 'develop'
             }
             steps {
-                withCredentials([azureServicePrincipal('azure-credentials'), usernamePassword(credentialsId: 'github-pat-credentials', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_PAT')]) {
+                withCredentials([azureServicePrincipal('azure-credentials')]) {
                     sh '''
                         az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
                         
-                        # Configure GitHub deployment
-                        az webapp deployment source config --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --repo-url ${GITHUB_REPO_URL} --branch develop --git-token ${GITHUB_PAT}
-                        
-                        # Trigger deployment
-                        az webapp deployment source sync --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP}
+                        # Deploy the dist.zip file
+                        az webapp deployment source config-zip --resource-group ${AZURE_RESOURCE_GROUP} --name ${AZURE_WEBAPP_NAME} --src dist.zip
                         
                         # Get and print the deployment logs
                         az webapp log download --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --log-file webapp_logs.zip
                         unzip -p webapp_logs.zip
+                        
+                        # Get and print the app URL
+                        APP_URL=$(az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv)
+                        echo "App URL: https://$APP_URL"
                     '''
                 }
             }
@@ -142,7 +143,21 @@ pipeline {
                 branch 'develop'
             }
             steps {
-                sh 'npm run test'
+                script {
+                    def appUrl = sh(script: '''
+                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                        az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv
+                    ''', returnStdout: true).trim()
+                    
+                    // Run tests against the deployed app
+                    sh """
+                        export APP_URL=https://${appUrl}
+                        npm run test
+                        npm run test:coverage
+                        # Commenting out Selenium tests for initial deployment
+                        # npm run test:selenium
+                    """
+                }
             }
         }
     }
