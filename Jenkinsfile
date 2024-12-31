@@ -92,49 +92,57 @@ pipeline {
             }
         }
         
-        stage('Deploy to Dev') {
-            when {
-                expression {
-                    return env.BRANCH_NAME == 'develop'
+	stage('Create Zip') {
+		steps {
+			sh 'npm run create-zip'
+			sh 'ls -l dist/dist.zip'
+			sh 'pwd'
+		}
+	}
+        
+       stage('Deploy to Dev') {
+    when {
+        expression {
+            return env.BRANCH_NAME == 'develop'
+        }
+    }
+    steps {
+        script {
+            echo "Current branch: ${env.BRANCH_NAME}"
+            echo "Starting deployment to Dev"
+            try {
+                withCredentials([azureServicePrincipal('azure-credentials')]) {
+                    sh '''
+                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                        
+                        az group create --name ${AZURE_RESOURCE_GROUP} --location ${AZURE_LOCATION}
+                        
+                        az appservice plan create --name ${AZURE_APP_PLAN} --resource-group ${AZURE_RESOURCE_GROUP} --sku ${AZURE_APP_SKU} --is-linux
+                        
+                        az webapp create --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --plan ${AZURE_APP_PLAN} --runtime "NODE:16-lts"
+                        
+                        az webapp config appsettings set --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --settings WEBSITE_NODE_DEFAULT_VERSION=16-lts
+                        
+                        az webapp config set --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --always-on true
+                        
+                        az webapp log config --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --web-server-logging filesystem
+                        
+                        az webapp deploy --resource-group ${AZURE_RESOURCE_GROUP} --name ${AZURE_WEBAPP_NAME} --src-path "${WORKSPACE}/dist/dist.zip" --type zip
+                        
+                        APP_URL=$(az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv)
+                        echo "App URL: https://$APP_URL"
+                    '''
+                    env.DEPLOYMENT_SUCCESS = 'true'
+                    env.APP_URL = sh(script: 'az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv', returnStdout: true).trim()
+                    echo "Deployment successful. APP_URL: ${env.APP_URL}"
                 }
-            }
-            steps {
-                script {
-                    echo "Current branch: ${env.BRANCH_NAME}"
-                    echo "Starting deployment to Dev"
-                    try {
-                        withCredentials([azureServicePrincipal('azure-credentials')]) {
-                            sh '''
-                                az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                                
-                                az group create --name ${AZURE_RESOURCE_GROUP} --location ${AZURE_LOCATION}
-                                
-                                az appservice plan create --name ${AZURE_APP_PLAN} --resource-group ${AZURE_RESOURCE_GROUP} --sku ${AZURE_APP_SKU} --is-linux
-                                
-                                az webapp create --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --plan ${AZURE_APP_PLAN} --runtime "NODE:16-lts"
-                                
-                                az webapp config appsettings set --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --settings WEBSITE_NODE_DEFAULT_VERSION=16-lts
-                                
-                                az webapp config set --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --always-on true
-                                
-                                az webapp log config --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --web-server-logging filesystem
-                                
-                                az webapp deployment source config-zip --resource-group ${AZURE_RESOURCE_GROUP} --name ${AZURE_WEBAPP_NAME} --src dist.zip
-                                
-                                APP_URL=$(az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv)
-                                echo "App URL: https://$APP_URL"
-                            '''
-                            env.DEPLOYMENT_SUCCESS = 'true'
-                            env.APP_URL = sh(script: 'az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv', returnStdout: true).trim()
-                            echo "Deployment successful. APP_URL: ${env.APP_URL}"
-                        }
-                    } catch (Exception e) {
-                        echo "Deployment failed: ${e.getMessage()}"
-                        error "Deployment failed"
-                    }
-                }
+            } catch (Exception e) {
+                echo "Deployment failed: ${e.getMessage()}"
+                error "Deployment failed"
             }
         }
+    }
+}
         
         stage('Run Automated Tests on Dev') {
             when {
