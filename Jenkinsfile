@@ -45,7 +45,7 @@ stage('Deploy to Azure App Service') {
                 az appservice plan create --name $AZURE_APP_PLAN --resource-group $AZURE_RESOURCE_GROUP --sku $AZURE_APP_SKU --is-linux
 
                 # Create or update the web app
-                az webapp create --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --plan $AZURE_APP_PLAN --runtime "NODE" --runtime-version "18-lts"
+               az webapp create --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --plan $AZURE_APP_PLAN --runtime "NODE:18-lts"
 
                 # Deploy the app
                 az webapp deployment source config-zip --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_WEBAPP_NAME --src dist.zip
