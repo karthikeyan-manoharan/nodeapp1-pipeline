@@ -219,7 +219,6 @@ pipeline {
             }
         }
     }
-    
     post {
         failure {
             script {
