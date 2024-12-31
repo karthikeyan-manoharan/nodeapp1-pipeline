@@ -35,19 +35,15 @@ stage('Deploy to Azure App Service') {
         withCredentials([azureServicePrincipal('azure-credentials')]) {
             sh '''
                 echo "Deploying to Azure App Service..."
-				
-				# Print current directory and list files
+                
+                # Print current directory and list files
                 pwd
                 ls -la
                 
-                # Ensure we're in the correct directory
-                #cd "${WORKSPACE}"
+                # Copy dist.zip to a Windows-accessible location
+                cp dist.zip /mnt/c/dist.zip
                 
-                # Print current directory and list files again
-                pwd
-                ls -la
-				
-				
+                # Login to Azure
                 az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
                 az account set --subscription $AZURE_SUBSCRIPTION_ID
                 
@@ -58,10 +54,13 @@ stage('Deploy to Azure App Service') {
                 az appservice plan create --name $AZURE_APP_PLAN --resource-group $AZURE_RESOURCE_GROUP --sku $AZURE_APP_SKU --is-linux
 
                 # Create or update the web app
-               az webapp create --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --plan $AZURE_APP_PLAN --runtime "NODE:18-lts"
+                az webapp create --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --plan $AZURE_APP_PLAN --runtime "NODE:18-lts"
 
-                # Deploy the app
-                az webapp deployment source config-zip --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_WEBAPP_NAME --src "${WINDOWS_WORKSPACE}\\dist.zip"
+                # Deploy the app using the Windows path
+                az webapp deployment source config-zip --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_WEBAPP_NAME --src "C:\\dist.zip"
+                
+                # Clean up
+                rm /mnt/c/dist.zip
             '''
         }
     }
