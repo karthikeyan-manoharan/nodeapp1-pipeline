@@ -15,6 +15,11 @@ pipeline {
         
         GITHUB_REPO_URL = 'https://github.com/karthikeyan-manoharan/reactjs-express-typescript-app.git'
         
+	    // Add these new variables
+        NODE_OPTIONS = '--max-old-space-size=4096'
+        NPM_CONFIG_PREFIX = "${WORKSPACE}/.npm-global"
+        PATH = "${WORKSPACE}/.npm-global/bin:${env.PATH}"
+    
         DEPLOYMENT_SUCCESS = 'false'
         TESTS_SUCCESS = 'false'
         APP_PID = ''
@@ -61,18 +66,14 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
+                    npm config set prefix "${NPM_CONFIG_PREFIX}"
                     npm install --no-fund
                     npm install --save-dev selenium-webdriver @types/selenium-webdriver
+                    npm install -g concurrently wait-on
                 '''
             }
         }
-        
-        stage('Build') {
-            steps {
-                sh 'npm run build --no-fund'
-            }
-        }
-      
+
         stage('Run Tests') {
             parallel {
                 stage('Unit Tests') {
@@ -109,7 +110,6 @@ pipeline {
                                     set -x
                                     export CHROME_BIN=${CHROME_BIN}
                                     export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
-                                    npm install -g concurrently wait-on
                                     concurrently --kill-others --success first "npm start" "wait-on http://localhost:3000 && jest tests/selenium.test.ts"
                                 '''
                                 echo "Selenium tests passed"
@@ -122,7 +122,6 @@ pipeline {
                 }
             }
         }
-
         stage('Deploy to Dev') {
             when {
                 branch 'develop'
