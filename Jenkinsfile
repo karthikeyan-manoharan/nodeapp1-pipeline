@@ -91,16 +91,17 @@ pipeline {
                 }
             }
         }
-        
-	stage('Create Zip') {
-		steps {
-			sh 'npm run create-zip'
-			sh 'ls -l dist/dist.zip'
-			sh 'pwd'
+		stage('Create Zip') {
+			steps {
+				sh 'npm run create-zip'
+				sh 'ls -l dist.zip'
+				sh 'pwd'
+			}
 		}
-	}
-        
-       stage('Deploy to Dev') {
+       
+	   
+	   
+	   sstage('Deploy to Dev') {
     when {
         expression {
             return env.BRANCH_NAME == 'develop'
@@ -127,7 +128,7 @@ pipeline {
                         
                         az webapp log config --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --web-server-logging filesystem
                         
-                        az webapp deploy --resource-group ${AZURE_RESOURCE_GROUP} --name ${AZURE_WEBAPP_NAME} --src-path "${WORKSPACE}/dist/dist.zip" --type zip
+                        az webapp deploy --resource-group ${AZURE_RESOURCE_GROUP} --name ${AZURE_WEBAPP_NAME} --src-path "${WORKSPACE}/dist.zip" --type zip
                         
                         APP_URL=$(az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv)
                         echo "App URL: https://$APP_URL"
@@ -143,6 +144,8 @@ pipeline {
         }
     }
 }
+
+
         
         stage('Run Automated Tests on Dev') {
             when {
