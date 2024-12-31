@@ -115,7 +115,6 @@ pipeline {
                 }
             }
         }
-
         stage('Deploy to Dev') {
             when {
                 branch 'develop'
@@ -156,7 +155,6 @@ pipeline {
                 }
             }
         }
-
         stage('Run Automated Tests on Dev') {
             when {
                 branch 'develop'
@@ -179,7 +177,6 @@ pipeline {
                 }
             }
         }
-
         stage('Manual Testing Approval') {
             when {
                 branch 'develop'

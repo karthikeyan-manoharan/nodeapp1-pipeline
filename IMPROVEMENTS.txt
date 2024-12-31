@@ -1,0 +1,103 @@
+Based on the Jenkins pipeline output, here's a summary of what happened and some suggestions for improvement:
+
+1. The pipeline ran successfully up to the "Run Tests" stage.
+
+2. The "Unit Tests" and "Coverage Tests" passed successfully.
+
+3. The "Selenium Tests" failed with the error message "Selenium tests failed: script returned exit code 1".
+
+4. The "Deploy to Dev", "Run Automated Tests on Dev", and "Manual Testing Approval" stages were skipped due to conditional checks.
+
+5. The Azure cost reporting at the end of the pipeline didn't return any cost, possibly due to the date range used.
+
+Here are some suggestions to improve the pipeline:
+
+1. Investigate Selenium Test Failure:
+   The Selenium tests are failing. You need to investigate why. It could be due to timing issues, browser compatibility, or actual test failures. Add more detailed logging to the Selenium test stage to help diagnose the issue.
+
+2. Improve Selenium Test Setup:
+   Modify the Selenium test stage to include more robust application startup checks and error handling. For example:
+
+   ```groovy
+   stage('Selenium Tests') {
+       steps {
+           script {
+               try {
+                   sh '''
+                       set -x
+                       export CHROME_BIN=${CHROME_BIN}
+                       export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
+                       npm start &
+                       APP_PID=$!
+                       echo "Application started with PID: $APP_PID"
+                       
+                       # Wait for the application to start
+                       for i in {1..30}; do
+                           if curl -s http://localhost:3000 > /dev/null; then
+                               echo "Application is up and running"
+                               break
+                           fi
+                           if [ $i -eq 30 ]; then
+                               echo "Application failed to start"
+                               exit 1
+                           fi
+                           echo "Waiting for application to start... (Attempt $i/30)"
+                           sleep 2
+                       done
+                       
+                       npm run test:selenium
+                       TEST_EXIT_CODE=$?
+                       
+                       kill $APP_PID
+                       exit $TEST_EXIT_CODE
+                   '''
+               } catch (Exception e) {
+                   echo "Selenium tests failed: ${e.getMessage()}"
+                   currentBuild.result = 'UNSTABLE'
+               }
+           }
+       }
+   }
+   ```
+
+3. Review Conditional Stages:
+   The "Deploy to Dev", "Run Automated Tests on Dev", and "Manual Testing Approval" stages were skipped. Review the conditions for these stages to ensure they align with your intended pipeline flow.
+
+4. Improve Azure Cost Reporting:
+   The Azure cost reporting didn't return any cost. This could be due to the date range used or because there were no costs for the specified period. Modify the date range or add error handling:
+
+   ```groovy
+   sh '''
+       START_DATE=$(date -d "30 days ago" '+%Y-%m-%d')
+       END_DATE=$(date '+%Y-%m-%d')
+       COST=$(az consumption usage list --start-date $START_DATE --end-date $END_DATE --query "[].{Cost:pretaxCost}" -o tsv | awk '{sum += $1} END {print sum}')
+       if [ -z "$COST" ]; then
+           echo "No cost data available for the period $START_DATE to $END_DATE"
+       else
+           echo "Azure cost for the last 30 days: $COST"
+       fi
+   '''
+   ```
+
+5. Add Security Scan:
+   Consider adding a security scan stage to address the vulnerabilities reported by npm audit:
+
+   ```groovy
+   stage('Security Scan') {
+       steps {
+           sh '''
+               npm audit
+               npm audit fix --force
+               npm audit
+           '''
+       }
+   }
+   ```
+
+6. Improve Error Handling:
+   Add more comprehensive error handling and logging throughout the pipeline to make troubleshooting easier.
+
+7. Consider Parallel Execution:
+   If possible, run more stages in parallel to speed up the pipeline execution.
+
+By implementing these suggestions, you should be able to improve the reliability and efficiency of your pipeline, as well as address the Selenium test failures and other issues you're encountering.
