@@ -101,12 +101,12 @@ pipeline {
        
 	   
 	   
-	   sstage('Deploy to Dev') {
-    when {
-        expression {
-            return env.BRANCH_NAME == 'develop'
-        }
-    }
+	   stage('Deploy to Dev') {
+			when {
+				expression {
+					return env.BRANCH_NAME == 'develop'
+				}
+			}
     steps {
         script {
             echo "Current branch: ${env.BRANCH_NAME}"
