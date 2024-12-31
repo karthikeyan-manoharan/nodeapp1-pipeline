@@ -14,15 +14,15 @@ describe('Selenium Test', () => {
       options.setChromeBinaryPath(process.env.CHROME_BIN);
     }
 
-    let service;
+    let serviceBuilder;
     if (process.env.CHROMEDRIVER_BIN) {
-      service = new chrome.ServiceBuilder(process.env.CHROMEDRIVER_BIN).build();
-      chrome.setDefaultService(service);
+      serviceBuilder = new chrome.ServiceBuilder(process.env.CHROMEDRIVER_BIN);
     }
 
     driver = await new Builder()
       .forBrowser('chrome')
       .setChromeOptions(options)
+      .setChromeService(serviceBuilder)
       .build();
   }, 30000);
 

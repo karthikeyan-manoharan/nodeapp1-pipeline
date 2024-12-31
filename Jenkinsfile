@@ -66,24 +66,24 @@ stage('Install Chrome and ChromeDriver') {
                 '''
             }
         }
-        stage('Test') {
-            steps {
-                sh '''
-                    export CHROME_BIN=${CHROME_BIN}
-                    export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
-                    export PATH=$PATH:${CHROMEDRIVER_DIR}
-                    echo "Chrome binary path: ${CHROME_BIN}"
-                    echo "ChromeDriver binary path: ${CHROMEDRIVER_BIN}"
-                    echo "PATH: $PATH"
-                    echo "Chrome version:"
-                    ${CHROME_BIN} --version
-                    echo "ChromeDriver version:"
-                    ${CHROMEDRIVER_BIN} --version
-                    echo "Running tests..."
-                    npm run test:ci || (echo "Test failed. Printing error logs:"; find . -name "*.log" -type f -print0 | xargs -0 cat; exit 1)
-                '''
-            }
-        }
+stage('Test') {
+    steps {
+        sh '''
+            export CHROME_BIN=${CHROME_BIN}
+            export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
+            export PATH=$PATH:${CHROMEDRIVER_DIR}
+            echo "Chrome binary path: ${CHROME_BIN}"
+            echo "ChromeDriver binary path: ${CHROMEDRIVER_BIN}"
+            echo "PATH: $PATH"
+            echo "Chrome version:"
+            ${CHROME_BIN} --version
+            echo "ChromeDriver version:"
+            ${CHROMEDRIVER_BIN} --version
+            echo "Running tests..."
+            npm run test:ci || (echo "Test failed. Printing error logs:"; find . -name "*.log" -type f -print0 | xargs -0 cat; exit 1)
+        '''
+    }
+}
         stage('Stop Application') {
             steps {
                 sh '''
