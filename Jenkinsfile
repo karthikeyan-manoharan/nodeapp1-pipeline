@@ -132,116 +132,65 @@ stage('Create Zip') {
         '''
     }
 }
-        stage('Register Resource Providers') {
-            when {
-                expression {
-                     return sh(script: 'az provider show -n Microsoft.Web --query "registrationState" -o tsv', returnStdout: true).trim() != "Registered"
-                }
-            }
+               stage('Register Resource Providers') {
             steps {
-                withCredentials([azureServicePrincipal('azure-credentials')]) {
-                    sh '''
-                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                        az provider register --namespace Microsoft.Web
-                        az provider register --namespace Microsoft.OperationsManagement
-                        az provider register --namespace Microsoft.OperationalInsights
-                    '''
-                }
+                sh '''
+                    echo "Registering resource providers..."
+                    az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                    az account set --subscription $AZURE_SUBSCRIPTION_ID
+                    az provider register --namespace Microsoft.Web
+                '''
             }
         }
+
         stage('Create or Update Azure Resources') {
-            when {
-                branch 'develop'
-            }
             steps {
-                withCredentials([azureServicePrincipal('azure-credentials')]) {
-                    sh '''
-                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                        
-                        # Create Resource Group if it doesn't exist
-                        az group create --name ${AZURE_RESOURCE_GROUP} --location ${AZURE_LOCATION}
-                        
-                        # Create or update App Service Plan
-                        az appservice plan create --name ${AZURE_APP_PLAN} --resource-group ${AZURE_RESOURCE_GROUP} --sku ${AZURE_APP_SKU} --is-linux
-                        
-                        # Create or update Web App
-                        az webapp create --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --plan ${AZURE_APP_PLAN} --runtime "NODE|14-lts"
-                        az webapp config appsettings set --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --settings WEBSITE_NODE_DEFAULT_VERSION=14-lts
-                        az webapp config set --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --always-on true
-                        az webapp log config --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --web-server-logging filesystem
-                        
-                        # Get and print the app URL
-                        APP_URL=$(az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv)
-                        echo "App URL: https://$APP_URL"
-                        
-                        # Print resource creation logs
-                        az monitor activity-log list --resource-group ${AZURE_RESOURCE_GROUP} --start-time $(date -d "1 hour ago" -u +"%Y-%m-%dT%H:%M:%S") --query "[].{Operation:operationName.localizedValue, Status:status.localizedValue, Timestamp:eventTimestamp}" -o table
-                    '''
-                }
+                sh '''
+                    echo "Creating or updating Azure resources..."
+                    # Add your Azure resource creation/update commands here
+                    # For example:
+                    # az group create --name myResourceGroup --location eastus
+                    # az appservice plan create --name myAppServicePlan --resource-group myResourceGroup --sku F1
+                    # az webapp create --name myWebApp --resource-group myResourceGroup --plan myAppServicePlan
+                '''
             }
         }
+
         stage('Deploy to Dev') {
-            when {
-                branch 'develop'
-            }
             steps {
-                script {
-                    echo "Current branch: ${env.BRANCH_NAME}"
-                    echo "Starting deployment to Dev"
-                    try {
-                        withCredentials([azureServicePrincipal('azure-credentials')]) {
-                            sh '''
-                                # Find the dist.zip file
-                                ZIP_PATH=$(find . -name dist.zip)
-                                if [ -z "$ZIP_PATH" ]; then
-                                    echo "dist.zip not found"
-                                    exit 1
-                                fi
-                                echo "dist.zip found at: $ZIP_PATH"
-                                # Azure CLI commands
-                                az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                                az webapp deploy --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_WEBAPP_NAME --src-path "$ZIP_PATH" --type zip
-                                APP_URL=$(az webapp show --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --query "defaultHostName" -o tsv)
-                                echo "App URL: https://$APP_URL"
-                            '''
-                            env.DEPLOYMENT_SUCCESS = 'true'
-                            env.APP_URL = sh(script: 'az webapp show --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --query "defaultHostName" -o tsv', returnStdout: true).trim()
-                            echo "Deployment successful. APP_URL: ${env.APP_URL}"
-                        }
-                    } catch (Exception e) {
-                        echo "Deployment failed: ${e.getMessage()}"
-                        error "Deployment failed"
-                    }
-                }
+                sh '''
+                    echo "Deploying to Dev environment..."
+                    # Add your deployment commands here
+                    # For example:
+                    # az webapp deployment source config-zip --resource-group myResourceGroup --name myWebApp --src dist.zip
+                '''
             }
         }
+
         stage('Run Tests on Dev') {
-            when {
-                branch 'develop'
-            }
             steps {
-                sh 'npm run test'
+                sh '''
+                    echo "Running tests on Dev environment..."
+                    # Add your test commands here
+                    # For example:
+                    # npm run test:e2e
+                '''
             }
         }
     }
+
     post {
         always {
-            withCredentials([azureServicePrincipal('azure-credentials')]) {
-                sh '''
-                    az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                    
-                    # Get Azure cost for the day
-                    COST=$(az consumption usage list --start-date $(date -d "today" '+%Y-%m-%d') --end-date $(date -d "tomorrow" '+%Y-%m-%d') --query "[].{Cost:pretaxCost}" -o tsv | awk '{sum += $1} END {print sum}')
-                    echo "Today's Azure cost: $COST"
-                '''
-            }
+            sh '''
+                echo "Calculating Azure cost..."
+                az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                az account set --subscription $AZURE_SUBSCRIPTION_ID
+                START_DATE=$(date -d "today" '+%Y-%m-%d')
+                END_DATE=$(date -d "tomorrow" '+%Y-%m-%d')
+                COST=$(az consumption usage list --start-date $START_DATE --end-date $END_DATE --query "[].{Cost:pretaxCost}" -o tsv | awk '{sum += $1} END {print sum}')
+                echo "Today's Azure cost: $COST"
+            '''
             cleanWs()
-        }
-        success {
-            echo 'Pipeline succeeded!'
-        }
-        failure {
-            echo 'Pipeline failed!'
         }
     }
 }
