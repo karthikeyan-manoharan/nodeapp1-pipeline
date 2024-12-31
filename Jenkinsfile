@@ -65,12 +65,17 @@ pipeline {
         
         stage('Install Dependencies') {
             steps {
-                sh '''
-                    npm config set prefix "${NPM_CONFIG_PREFIX}"
-                    npm install --no-fund
-                    npm install --save-dev selenium-webdriver @types/selenium-webdriver
-                    npm install -g concurrently wait-on
-                '''
+            //    sh '''
+            //        npm config set prefix "${NPM_CONFIG_PREFIX}"
+            //       npm install --no-fund
+            //       npm install --save-dev selenium-webdriver @types/selenium-webdriver
+            //       npm install -g concurrently wait-on
+            //   '''
+			
+				sh 'npm config set prefix /var/lib/jenkins/workspace/NodejsCIPipeline/.npm-global'
+				sh 'npm install --no-fund'
+				sh 'npm install --save-dev selenium-webdriver @types/selenium-webdriver'
+				sh 'npm install -g concurrently wait-on start-server-and-test'
             }
         }
 		
