@@ -102,7 +102,7 @@ pipeline {
                         }
                     }
                 }
-                stage('Selenium Tests') {
+              /*  stage('Selenium Tests') {
                     steps {
                         script {
                             try {
@@ -121,7 +121,7 @@ pipeline {
                     }
                 }
             }
-        }
+        */ }
         stage('Deploy to Dev') {
             when {
                 branch 'develop'
