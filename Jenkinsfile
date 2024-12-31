@@ -18,19 +18,20 @@ pipeline {
         NODE_OPTIONS = '--max-old-space-size=4096'
         NPM_CONFIG_PREFIX = "${WORKSPACE}/.npm-global"
         PATH = "${WORKSPACE}/.npm-global/bin:${env.PATH}"
-    
+        
         DEPLOYMENT_SUCCESS = 'false'
         TESTS_SUCCESS = 'false'
         APP_PID = ''
         
-        GIT_BRANCH = sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
+        // Updated branch detection
+        BRANCH_NAME = "${env.GIT_BRANCH?.tokenize('/')?.last() ?: env.BRANCH_NAME}"
     }
     stages {
         stage('Debug Info') {
             steps {
                 sh 'git branch --show-current'
-                sh 'echo $GIT_BRANCH'
-                sh 'echo $BRANCH_NAME'
+                sh 'echo GIT_BRANCH: $GIT_BRANCH'
+                sh 'echo BRANCH_NAME: $BRANCH_NAME'
                 sh 'git rev-parse --abbrev-ref HEAD'
             }
         }
@@ -94,13 +95,13 @@ pipeline {
     
         stage('Deploy to Dev') {
             when {
-                expression { 
-                    return env.GIT_BRANCH == 'develop' || env.GIT_BRANCH == 'origin/develop'
+                expression {
+                    return env.BRANCH_NAME == 'develop'
                 }
             }
             steps {
                 script {
-                    echo "Current branch: ${env.GIT_BRANCH}"
+                    echo "Current branch: ${env.BRANCH_NAME}"
                     echo "Starting deployment to Dev"
                     try {
                         withCredentials([azureServicePrincipal('azure-credentials')]) {
@@ -139,8 +140,8 @@ pipeline {
         }
         stage('Run Automated Tests on Dev') {
             when {
-                expression { 
-                    return (env.GIT_BRANCH == 'develop' || env.GIT_BRANCH == 'origin/develop') && env.DEPLOYMENT_SUCCESS == 'true'
+                expression {
+                    return env.BRANCH_NAME == 'develop' && env.DEPLOYMENT_SUCCESS == 'true'
                 }
             }
             steps {
@@ -164,8 +165,8 @@ pipeline {
         }
         stage('Manual Testing Approval') {
             when {
-                expression { 
-                    return (env.GIT_BRANCH == 'develop' || env.GIT_BRANCH == 'origin/develop') && 
+                expression {
+                    return env.BRANCH_NAME == 'develop' &&
                            env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true'
                 }
             }
@@ -183,8 +184,8 @@ pipeline {
         
         stage('Delete Azure Resources') {
             when {
-                expression { 
-                    return (env.GIT_BRANCH == 'develop' || env.GIT_BRANCH == 'origin/develop') && 
+                expression {
+                    return env.BRANCH_NAME == 'develop' &&
                            env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true'
                 }
             }
