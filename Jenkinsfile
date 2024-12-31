@@ -32,10 +32,8 @@ pipeline {
                     
                     # Install ChromeDriver
                     mkdir -p ${CHROMEDRIVER_DIR}
-                    wget -q -O chromedriver.zip https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip
+                    wget -q -O chromedriver.zip https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip
                     unzip -q -o chromedriver.zip -d ${CHROMEDRIVER_DIR}
-                    mv ${CHROMEDRIVER_DIR}/chromedriver-linux64/chromedriver ${CHROMEDRIVER_BIN}
-                    rm -rf ${CHROMEDRIVER_DIR}/chromedriver-linux64
                     chmod +x ${CHROMEDRIVER_BIN}
                     
                     # Verify installed versions
@@ -49,10 +47,7 @@ pipeline {
         
         stage('Install Dependencies') {
             steps {
-                sh '''
-                    npm install
-                    npm install --save-dev selenium-webdriver @types/selenium-webdriver
-                '''
+                sh 'npm install'
             }
         }
         stage('Build') {
@@ -84,9 +79,7 @@ pipeline {
                     echo "ChromeDriver version:"
                     ${CHROMEDRIVER_BIN} --version
                     echo "Running tests..."
-                    npm run test || (echo "Test failed. Printing error logs:"; find . -name "*.log" -type f -print0 | xargs -0 cat; exit 1)
-                    npm run test:coverage
-                    npm run test:all
+                    npm run test:ci || (echo "Test failed. Printing error logs:"; find . -name "*.log" -type f -print0 | xargs -0 cat; exit 1)
                 '''
             }
         }
