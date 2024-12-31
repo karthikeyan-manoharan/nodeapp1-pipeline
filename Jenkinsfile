@@ -21,7 +21,6 @@ pipeline {
                 checkout scm
             }
         }
-        
         stage('Install Chrome and ChromeDriver') {
             steps {
                 sh '''
@@ -44,93 +43,41 @@ pipeline {
                 '''
             }
         }
-        
         stage('Install Dependencies') {
             steps {
-                sh '''
-                    npm install --no-fund
-                    npm install --save-dev selenium-webdriver @types/selenium-webdriver
-                '''
+                sh 'npm install'
             }
         }
-        
-        stage('Build') {
+        stage('Build and Test') {
             steps {
-                sh 'npm run build'
-            }
-        }
-        
-
-
-
-
-stage('Start Application') {
-    steps {
-        script {
-            echo "Starting the application"
-            sh '''
-                npm run build
-                nohup npm start &
-                echo $! > .pidfile
-                sleep 10  # Give the app some time to start
-            '''
-        }
-    }
-}
-
-stage('Test') {
-    steps {
-        script {
-            try {
                 sh '''
                     export CHROME_BIN=${CHROME_BIN}
                     export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
-                    echo "CHROME_BIN: $CHROME_BIN"
-                    echo "CHROMEDRIVER_BIN: $CHROMEDRIVER_BIN"
-                    npm run test
-                    npm run test:coverage
-                    DEBUG=selenium-webdriver:* npm run test:selenium
+                    npm run build
+                    npm run test:all
                 '''
-            } catch (Exception e) {
-                echo "Test stage failed: ${e.getMessage()}"
-                echo "Selenium test logs:"
-                sh 'cat selenium-debug.log || echo "No selenium-debug.log file found"'
-                currentBuild.result = 'FAILURE'
-                error "Test stage failed"
             }
         }
-    }
-}
-
-stage('Stop Application') {
-    steps {
-        script {
-            echo "Stopping the application"
-            sh '''
-                if [ -f .pidfile ]; then
-                    kill $(cat .pidfile)
-                    rm .pidfile
-                fi
-            '''
-        }
-    }
-}
-
-
-        
-        stage('Create Zip') {
+        stage('Debug File Location') {
             steps {
                 sh '''
-                    npm run create-zip
-                    echo "Contents of current directory after zip creation:"
+                    echo "Current working directory:"
+                    pwd
+                    echo "Contents of current directory:"
                     ls -la
+                    echo "Contents of dist directory (if it exists):"
+                    ls -la dist || echo "dist directory does not exist"
                     echo "Location of dist.zip:"
                     find . -name dist.zip
                 '''
             }
         }
-        
         stage('Register Resource Providers') {
+            when {
+                expression {
+                     return sh(script: 'az provider show -n Microsoft.Web --query "registrationState" -o tsv', returnStdout: true).trim() != "Registered"
+                }
+            }
             steps {
                 withCredentials([azureServicePrincipal('azure-credentials')]) {
                     sh '''
@@ -142,7 +89,6 @@ stage('Stop Application') {
                 }
             }
         }
-
         stage('Create or Update Azure Resources') {
             when {
                 branch 'develop'
@@ -174,7 +120,6 @@ stage('Stop Application') {
                 }
             }
         }
-
         stage('Deploy to Dev') {
             when {
                 branch 'develop'
@@ -201,7 +146,7 @@ stage('Stop Application') {
                             '''
                             env.DEPLOYMENT_SUCCESS = 'true'
                             env.APP_URL = sh(script: 'az webapp show --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --query "defaultHostName" -o tsv', returnStdout: true).trim()
-                            echo "Deployment successful. APP_URL: ${env.APP_URL}"
+                            echo "Deployment successful. APP_URL: ${env.APP_URL}"							
                         }
                     } catch (Exception e) {
                         echo "Deployment failed: ${e.getMessage()}"

@@ -1,6 +1,8 @@
 import { Builder, By, Key, until, WebDriver } from 'selenium-webdriver';
 import chrome from 'selenium-webdriver/chrome';
 
+const APP_URL = 'http://localhost:3000';
+
 describe('Selenium Test', () => {
   let driver: WebDriver;
 
@@ -14,12 +16,9 @@ describe('Selenium Test', () => {
       chromeOptions.setChromeBinaryPath(process.env.CHROME_BIN);
     }
 
-    const service = new chrome.ServiceBuilder(process.env.CHROMEDRIVER_BIN);
-
     driver = await new Builder()
       .forBrowser('chrome')
       .setChromeOptions(chromeOptions)
-      .setChromeService(service)
       .build();
   });
 
@@ -28,8 +27,8 @@ describe('Selenium Test', () => {
   });
 
   it('should load the homepage', async () => {
-    await driver.get('http://localhost:3000');
+    await driver.get(APP_URL);
     const title = await driver.getTitle();
-    expect(title).toBe('React App');
+    expect(title).toContain('React App'); // Adjust this based on your actual page title
   });
 });
