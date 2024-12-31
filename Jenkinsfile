@@ -22,6 +22,8 @@ pipeline {
         DEPLOYMENT_SUCCESS = 'false'
         TESTS_SUCCESS = 'false'
         APP_PID = ''
+        
+        GIT_BRANCH = sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
     }
     stages {
         stage('Debug Info') {
@@ -29,6 +31,7 @@ pipeline {
                 sh 'git branch --show-current'
                 sh 'echo $GIT_BRANCH'
                 sh 'echo $BRANCH_NAME'
+                sh 'git rev-parse --abbrev-ref HEAD'
             }
         }
         stage('Checkout') {
@@ -91,13 +94,13 @@ pipeline {
     
         stage('Deploy to Dev') {
             when {
-                anyOf {
-                    branch 'develop'
-                    branch 'origin/develop'
+                expression { 
+                    return env.GIT_BRANCH == 'develop' || env.GIT_BRANCH == 'origin/develop'
                 }
             }
             steps {
                 script {
+                    echo "Current branch: ${env.GIT_BRANCH}"
                     echo "Starting deployment to Dev"
                     try {
                         withCredentials([azureServicePrincipal('azure-credentials')]) {
@@ -136,11 +139,9 @@ pipeline {
         }
         stage('Run Automated Tests on Dev') {
             when {
-                anyOf {
-                    branch 'develop'
-                    branch 'origin/develop'
+                expression { 
+                    return (env.GIT_BRANCH == 'develop' || env.GIT_BRANCH == 'origin/develop') && env.DEPLOYMENT_SUCCESS == 'true'
                 }
-                expression { env.DEPLOYMENT_SUCCESS == 'true' }
             }
             steps {
                 script {
@@ -163,11 +164,10 @@ pipeline {
         }
         stage('Manual Testing Approval') {
             when {
-                anyOf {
-                    branch 'develop'
-                    branch 'origin/develop'
+                expression { 
+                    return (env.GIT_BRANCH == 'develop' || env.GIT_BRANCH == 'origin/develop') && 
+                           env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true'
                 }
-                expression { env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true' }
             }
             steps {
                 script {
@@ -183,11 +183,10 @@ pipeline {
         
         stage('Delete Azure Resources') {
             when {
-                anyOf {
-                    branch 'develop'
-                    branch 'origin/develop'
+                expression { 
+                    return (env.GIT_BRANCH == 'develop' || env.GIT_BRANCH == 'origin/develop') && 
+                           env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true'
                 }
-                expression { env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true' }
             }
             steps {
                 script {
