@@ -60,29 +60,63 @@ pipeline {
             }
         }
         
-        stage('Test') {
-            steps {
-                script {
-                    try {
-                        sh '''
-                            export CHROME_BIN=${CHROME_BIN}
-                            export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
-                            echo "CHROME_BIN: $CHROME_BIN"
-                            echo "CHROMEDRIVER_BIN: $CHROMEDRIVER_BIN"
-                            npm run test
-                            npm run test:coverage
-                            DEBUG=selenium-webdriver:* npm run test:selenium
-                        '''
-                    } catch (Exception e) {
-                        echo "Test stage failed: ${e.getMessage()}"
-                        echo "Selenium test logs:"
-                        sh 'cat selenium-debug.log || echo "No selenium-debug.log file found"'
-                        currentBuild.result = 'FAILURE'
-                        error "Test stage failed"
-                    }
-                }
+
+
+
+
+stage('Start Application') {
+    steps {
+        script {
+            echo "Starting the application"
+            sh '''
+                npm run build
+                nohup npm start &
+                echo $! > .pidfile
+                sleep 10  # Give the app some time to start
+            '''
+        }
+    }
+}
+
+stage('Test') {
+    steps {
+        script {
+            try {
+                sh '''
+                    export CHROME_BIN=${CHROME_BIN}
+                    export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
+                    echo "CHROME_BIN: $CHROME_BIN"
+                    echo "CHROMEDRIVER_BIN: $CHROMEDRIVER_BIN"
+                    npm run test
+                    npm run test:coverage
+                    DEBUG=selenium-webdriver:* npm run test:selenium
+                '''
+            } catch (Exception e) {
+                echo "Test stage failed: ${e.getMessage()}"
+                echo "Selenium test logs:"
+                sh 'cat selenium-debug.log || echo "No selenium-debug.log file found"'
+                currentBuild.result = 'FAILURE'
+                error "Test stage failed"
             }
         }
+    }
+}
+
+stage('Stop Application') {
+    steps {
+        script {
+            echo "Stopping the application"
+            sh '''
+                if [ -f .pidfile ]; then
+                    kill $(cat .pidfile)
+                    rm .pidfile
+                fi
+            '''
+        }
+    }
+}
+
+
         
         stage('Create Zip') {
             steps {
