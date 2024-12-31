@@ -177,23 +177,56 @@ pipeline {
                 }
             }
         }
-        stage('Manual Testing Approval') {
-            when {
-                branch 'develop'
-                expression { env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true' }
-            }
-            steps {
-                script {
-                    echo "Application is ready for manual testing at https://${env.APP_URL}"
-                    echo "Please perform your manual tests and approve or reject the deployment."
-                    
-                    timeout(time: 24, unit: 'HOURS') {
-                        input message: "Have you completed manual testing? (Application URL: https://${env.APP_URL})", ok: "Manual Testing Complete"
-                    }
-                }
-            }
-        }
-    }
+			stage('Manual Testing Approval') {
+				when {
+					branch 'develop'
+					expression { env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true' }
+				}
+				steps {
+					script {
+						echo "Application is ready for manual testing at https://${env.APP_URL}"
+						echo "Please perform your manual tests and approve or reject the deployment."
+						
+						timeout(time: 24, unit: 'HOURS') {
+							input message: "Have you completed manual testing? (Application URL: https://${env.APP_URL})", ok: "Manual Testing Complete"
+						}
+					}
+				}
+			}
+		}
+		stage('Delete Azure Resources') {
+		when {
+			branch 'develop'
+			expression { env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true' }
+		}
+		steps {
+			script {
+				try {
+					timeout(time: 1, unit: 'HOURS') {
+						input message: "Do you want to delete the Azure resources?", ok: "Yes, delete resources"
+					}
+					withCredentials([azureServicePrincipal('azure-credentials')]) {
+						sh '''
+							az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+							
+							# Delete the Web App
+							az webapp delete --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP}
+							
+							# Delete the App Service Plan
+							az appservice plan delete --name ${AZURE_APP_PLAN} --resource-group ${AZURE_RESOURCE_GROUP} --yes
+							
+							# Delete the Resource Group
+							az group delete --name ${AZURE_RESOURCE_GROUP} --yes --no-wait
+							
+							echo "Azure resources deletion initiated"
+						'''
+					}
+				} catch (Exception e) {
+					echo "Resource deletion skipped or failed: ${e.getMessage()}"
+				}
+			}
+		}
+	}
     post {
         failure {
             script {

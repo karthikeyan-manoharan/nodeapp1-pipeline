@@ -101,3 +101,87 @@ Here are some suggestions to improve the pipeline:
    If possible, run more stages in parallel to speed up the pipeline execution.
 
 By implementing these suggestions, you should be able to improve the reliability and efficiency of your pipeline, as well as address the Selenium test failures and other issues you're encountering.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+The main modifications made to the Jenkinsfile were to enable and execute the Azure deployment steps. Here are the key changes and their consequences:
+
+1. Azure Deployment Stage:
+   The 'Deploy to Dev' stage was uncommented and fully implemented. This stage now:
+   - Creates or updates the Azure Resource Group
+   - Creates or updates the App Service Plan
+   - Creates or updates the Web App
+   - Deploys the application to Azure
+
+   Consequence: The pipeline will now attempt to deploy your application to Azure when running on the 'develop' branch. This means your application will be live on Azure after this stage completes successfully.
+
+2. Run Automated Tests on Dev:
+   This stage was enabled to run tests against the deployed application on Azure.
+
+   Consequence: After deployment, your automated tests will run against the live Azure environment, providing validation of the deployed application.
+
+3. Manual Testing Approval:
+   This stage was enabled, allowing for manual testing and approval of the deployed application.
+
+   Consequence: The pipeline will pause here, waiting for manual approval before proceeding. This gives you an opportunity to perform manual tests on the live environment.
+
+4. Post-deployment Actions:
+   - Rollback functionality was added in case of test failures after deployment.
+   - Azure cost reporting was implemented.
+
+   Consequence: If tests fail after deployment, the pipeline will attempt to rollback to the previous version. You'll also get a report of your Azure costs for the day.
+
+5. Environment Variables:
+   New environment variables were added for Azure-related configurations (e.g., AZURE_WEBAPP_NAME, AZURE_RESOURCE_GROUP, etc.).
+
+   Consequence: These variables are now available throughout the pipeline for use in Azure-related commands.
+
+6. Azure Credentials:
+   The pipeline now uses Azure credentials (referenced as 'azure-credentials') for authentication.
+
+   Consequence: You need to ensure these credentials are properly configured in Jenkins for the pipeline to work correctly.
+
+Overall Consequences:
+
+1. Resource Creation: The pipeline will create Azure resources if they don't exist. This could lead to costs in your Azure account.
+
+2. Live Deployment: Your application will be deployed to a live Azure environment. Ensure your 'develop' branch is in a state suitable for deployment.
+
+3. Increased Pipeline Duration: The additional Azure deployment and testing steps will increase the overall time the pipeline takes to run.
+
+4. Potential for Live Issues: Since you're deploying to a live environment, any issues in the code could potentially affect real users if not caught by the automated or manual testing stages.
+
+5. Azure Costs: Running resources in Azure will incur costs. The pipeline now includes cost reporting to help you keep track of this.
+
+6. Dependency on Azure: Your pipeline now depends on Azure services being available and responsive.
+
+7. Need for Azure Knowledge: Team members working with this pipeline will need some familiarity with Azure concepts and CLI commands for troubleshooting and maintenance.
+
+These changes transform your pipeline from a local build and test process to a full CI/CD pipeline that includes deployment to Azure, significantly expanding its scope and capabilities.
