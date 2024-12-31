@@ -11,7 +11,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server/index.ts",
     "start": "node dist/server/index.js",
     "test:selenium": "jest tests/selenium.test.ts",
-     "test:all": "npm run build && npx start-server-and-test 'node dist/server/index.js' http://localhost:3001 'jest --runInBand'"
+     "test:all": "npm run build && npx start-server-and-test 'node dist/server/index.js' http://localhost:3002 'jest --runInBand'"
   },
   "keywords": [],
   "author": "",

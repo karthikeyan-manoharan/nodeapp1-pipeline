@@ -17,8 +17,8 @@ app.listen(port, '0.0.0.0', () => {
 });
 
 // Also listen on localhost
-app.listen(port, 'localhost', () => {
-  console.log(`Server also running at http://localhost:${port}`);
-});
+//app.listen(port, 'localhost', () => {
+//  console.log(`Server also running at http://localhost:${port}`);
+//});
 
 export default app;

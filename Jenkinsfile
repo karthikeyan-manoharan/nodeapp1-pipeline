@@ -45,15 +45,24 @@ pipeline {
         }
         stage('Install Dependencies') {
             steps {
-                sh 'npm install'
+                sh '''
+                    npm install
+                    npm install --save-dev selenium-webdriver @types/selenium-webdriver
+                '''
             }
         }
-        stage('Build and Test') {
+        stage('Build') {
+            steps {
+                sh 'npm run build'
+            }
+        }
+        stage('Test') {
             steps {
                 sh '''
                     export CHROME_BIN=${CHROME_BIN}
                     export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
-                    npm run build
+                    npm run test
+                    npm run test:coverage
                     npm run test:all
                 '''
             }
@@ -67,6 +76,15 @@ pipeline {
                     ls -la
                     echo "Contents of dist directory (if it exists):"
                     ls -la dist || echo "dist directory does not exist"
+                '''
+            }
+        }
+        stage('Create Zip') {
+            steps {
+                sh '''
+                    npm run create-zip
+                    echo "Contents of current directory after zip creation:"
+                    ls -la
                     echo "Location of dist.zip:"
                     find . -name dist.zip
                 '''
@@ -146,13 +164,21 @@ pipeline {
                             '''
                             env.DEPLOYMENT_SUCCESS = 'true'
                             env.APP_URL = sh(script: 'az webapp show --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --query "defaultHostName" -o tsv', returnStdout: true).trim()
-                            echo "Deployment successful. APP_URL: ${env.APP_URL}"							
+                            echo "Deployment successful. APP_URL: ${env.APP_URL}"
                         }
                     } catch (Exception e) {
                         echo "Deployment failed: ${e.getMessage()}"
                         error "Deployment failed"
                     }
                 }
+            }
+        }
+        stage('Run Tests on Dev') {
+            when {
+                branch 'develop'
+            }
+            steps {
+                sh 'npm run test'
             }
         }
     }
