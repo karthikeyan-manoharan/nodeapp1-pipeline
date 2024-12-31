@@ -62,33 +62,52 @@ pipeline {
         
         stage('Build') {
             steps {
-                sh 'npm run build'
+                sh 'npm run build  --no-fund'
             }
         }
 		
 				
-		stage('Start Application') {
-			steps {
-				// Start the application
-					sh '''
-					set -x  # Enable verbose mode
-					export CHROME_BIN=${CHROME_BIN}
-					export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
-					# Check if a process is running on port 3000 and kill it if it exists
-					PORT_PID=$(lsof -t -i:3000 -sTCP:LISTEN)
-					if [ ! -z "$PORT_PID" ]; then
-						echo "Killing process on port 3000"
-						kill -9 $PORT_PID
-					fi
-					# Start the application
-					npm start &
-					APP_PID=$!
-					echo "Application started with PID: $APP_PID"
-					# Wait for the application to start
-					sleep 10
-					'''
-			}
-		}
+stage('Start Application') {
+    steps {
+        script {
+            try {
+                sh '''
+                    set -x  # Enable verbose mode
+                    export CHROME_BIN=${CHROME_BIN}
+                    export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
+                    
+                    # Check if a process is running on port 3000 and kill it if it exists
+                    PORT_PID=$(lsof -t -i:3000 -sTCP:LISTEN || true)
+                    if [ ! -z "$PORT_PID" ]; then
+                        echo "Killing process on port 3000"
+                        kill -9 $PORT_PID || true
+                    fi
+                    
+                    # Start the application
+                    npm start &
+                    APP_PID=$!
+                    echo "Application started with PID: $APP_PID"
+                    
+                    # Wait for the application to start
+                    for i in {1..30}; do
+                        if curl -s http://localhost:3000 > /dev/null; then
+                            echo "Application is up and running"
+                            exit 0
+                        fi
+                        sleep 1
+                    done
+                    
+                    echo "Application failed to start within 30 seconds"
+                    exit 1
+                '''
+            } catch (Exception e) {
+                echo "Failed to start application: ${e.getMessage()}"
+                currentBuild.result = 'FAILURE'
+                error "Failed to start application"
+            }
+        }
+    }
+}
 		
 		stage('Run Unit Tests') {
 			steps {
