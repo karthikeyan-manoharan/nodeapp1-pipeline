@@ -130,25 +130,45 @@ stage('Start Application') {
 					'''
 			}
 		}
-		stage('Run Selenium Tests') {
-			steps {
-				// Run npm run test:selenium
-				sh '''
-				
-				    set -x
+
+
+
+stage('Run Selenium Tests') {
+    steps {
+        script {
+            try {
+                sh '''
+                    set -x
                     export CHROME_BIN=${CHROME_BIN}
                     export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
-					
-					npm run test:selenium || true
-					# Kill the application process
-					if [ ! -z "$APP_PID" ]; then
-						echo "Killing application process with PID: $APP_PID"
-						kill -9 $APP_PID
-					fi
-				'''
-			}
-		}
-		
+                    npm start &
+                    APP_PID=$!
+                    echo "Application started with PID: $APP_PID"
+                    
+                    # Wait for the application to start
+                    for i in {1..30}; do
+                        if curl -s http://localhost:3000 > /dev/null; then
+                            echo "Application is up and running"
+                            break
+                        fi
+                        echo "Waiting for application to start... (Attempt $i/30)"
+                        sleep 2
+                    done
+                    
+                    npm run test:selenium
+                    TEST_EXIT_CODE=$?
+                    
+                    kill $APP_PID
+                    exit $TEST_EXIT_CODE
+                '''
+            } catch (Exception e) {
+                echo "Selenium tests failed: ${e.getMessage()}"
+                currentBuild.result = 'UNSTABLE'
+            }
+        }
+    }
+}
+
         stage('Register Resource Providers') {
             when {
                 expression {
