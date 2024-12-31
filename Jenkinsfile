@@ -35,6 +35,19 @@ stage('Deploy to Azure App Service') {
         withCredentials([azureServicePrincipal('azure-credentials')]) {
             sh '''
                 echo "Deploying to Azure App Service..."
+				
+				# Print current directory and list files
+                pwd
+                ls -la
+                
+                # Ensure we're in the correct directory
+                cd "${WORKSPACE}"
+                
+                # Print current directory and list files again
+                pwd
+                ls -la
+				
+				
                 az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
                 az account set --subscription $AZURE_SUBSCRIPTION_ID
                 
@@ -48,7 +61,7 @@ stage('Deploy to Azure App Service') {
                az webapp create --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --plan $AZURE_APP_PLAN --runtime "NODE:18-lts"
 
                 # Deploy the app
-                az webapp deployment source config-zip --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_WEBAPP_NAME --src dist.zip
+                az webapp deployment source config-zip --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_WEBAPP_NAME --src "${WORKSPACE}/dist.zip"
             '''
         }
     }
