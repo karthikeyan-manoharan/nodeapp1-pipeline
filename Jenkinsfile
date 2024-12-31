@@ -54,7 +54,7 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
-                    npm install
+                    npm install  --no-fund
                     npm install --save-dev selenium-webdriver @types/selenium-webdriver
                 '''
             }
@@ -66,8 +66,7 @@ pipeline {
             }
         }
 		
-		
-		
+				
 		stage('Start Application') {
 			steps {
 				// Start the application
