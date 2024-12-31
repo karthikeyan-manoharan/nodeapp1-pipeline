@@ -251,41 +251,38 @@ pipeline {
             }
         }
     }
-    post {
-        failure {
-            script {
-                if (env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'false') {
-                    echo "Tests failed, initiating rollback..."
-                    withCredentials([azureServicePrincipal('azure-credentials')]) {
-                        sh '''
-                            az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                            
-                            # Rollback to the previous deployment
-                            az webapp deployment slot swap --resource-group ${AZURE_RESOURCE_GROUP} --name ${AZURE_WEBAPP_NAME} --slot production --target-slot staging
-                            
-                            echo "Rollback completed"
-                        '''
-                    }
+post {
+    failure {
+        script {
+            if (env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'false') {
+                echo "Tests failed, initiating rollback..."
+                withCredentials([azureServicePrincipal('azure-credentials')]) {
+                    sh '''
+                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                        
+                        # Rollback to the previous deployment
+                        az webapp deployment slot swap --resource-group ${AZURE_RESOURCE_GROUP} --name ${AZURE_WEBAPP_NAME} --slot production --target-slot staging
+                        
+                        echo "Rollback completed"
+                    '''
                 }
             }
-        }
-        always {
-            withCredentials([azureServicePrincipal('azure-credentials')]) {
-                sh '''
-                    az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                    
-                    # Get Azure cost for the day
-                    COST=$(az consumption usage list --start-date $(date -d "today" '+%Y-%m-%d') --end-date $(date -d "tomorrow" '+%Y-%m-%d') --query "[].{Cost:pretaxCost}" -o tsv | awk '{sum += $1} END {print sum}')
-                    echo "Today's Azure cost: $COST"
-                '''
-            }
-            cleanWs()
-        }
-        success {
-            echo 'Pipeline succeeded!'
-        }
-        failure {
             echo 'Pipeline failed!'
         }
+    }
+    always {
+        withCredentials([azureServicePrincipal('azure-credentials')]) {
+            sh '''
+                az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                
+                # Get Azure cost for the day
+                COST=$(az consumption usage list --start-date $(date -d "today" '+%Y-%m-%d') --end-date $(date -d "tomorrow" '+%Y-%m-%d') --query "[].{Cost:pretaxCost}" -o tsv | awk '{sum += $1} END {print sum}')
+                echo "Today's Azure cost: $COST"
+            '''
+        }
+        cleanWs()
+    }
+    success {
+        echo 'Pipeline succeeded!'
     }
 }
