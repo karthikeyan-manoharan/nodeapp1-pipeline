@@ -132,38 +132,44 @@ stage('Create Zip') {
         '''
     }
 }
-               stage('Register Resource Providers') {
+
+
+        stage('Register Resource Providers') {
             steps {
-                sh '''
-                    echo "Registering resource providers..."
-                    az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                    az account set --subscription $AZURE_SUBSCRIPTION_ID
-                    az provider register --namespace Microsoft.Web
-                '''
+                withCredentials([azureServicePrincipal('AZURE_CREDENTIALS')]) {
+                    sh '''
+                        echo "Registering resource providers..."
+                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                        az account set --subscription $AZURE_SUBSCRIPTION_ID
+                        az provider register --namespace Microsoft.Web
+                    '''
+                }
             }
         }
 
         stage('Create or Update Azure Resources') {
             steps {
-                sh '''
-                    echo "Creating or updating Azure resources..."
-                    # Add your Azure resource creation/update commands here
-                    # For example:
-                    # az group create --name myResourceGroup --location eastus
-                    # az appservice plan create --name myAppServicePlan --resource-group myResourceGroup --sku F1
-                    # az webapp create --name myWebApp --resource-group myResourceGroup --plan myAppServicePlan
-                '''
+                withCredentials([azureServicePrincipal('AZURE_CREDENTIALS')]) {
+                    sh '''
+                        echo "Creating or updating Azure resources..."
+                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                        az account set --subscription $AZURE_SUBSCRIPTION_ID
+                        # Add your Azure resource creation/update commands here
+                    '''
+                }
             }
         }
 
         stage('Deploy to Dev') {
             steps {
-                sh '''
-                    echo "Deploying to Dev environment..."
-                    # Add your deployment commands here
-                    # For example:
-                    # az webapp deployment source config-zip --resource-group myResourceGroup --name myWebApp --src dist.zip
-                '''
+                withCredentials([azureServicePrincipal('AZURE_CREDENTIALS')]) {
+                    sh '''
+                        echo "Deploying to Dev environment..."
+                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                        az account set --subscription $AZURE_SUBSCRIPTION_ID
+                        # Add your deployment commands here
+                    '''
+                }
             }
         }
 
@@ -172,8 +178,6 @@ stage('Create Zip') {
                 sh '''
                     echo "Running tests on Dev environment..."
                     # Add your test commands here
-                    # For example:
-                    # npm run test:e2e
                 '''
             }
         }
@@ -181,15 +185,17 @@ stage('Create Zip') {
 
     post {
         always {
-            sh '''
-                echo "Calculating Azure cost..."
-                az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                az account set --subscription $AZURE_SUBSCRIPTION_ID
-                START_DATE=$(date -d "today" '+%Y-%m-%d')
-                END_DATE=$(date -d "tomorrow" '+%Y-%m-%d')
-                COST=$(az consumption usage list --start-date $START_DATE --end-date $END_DATE --query "[].{Cost:pretaxCost}" -o tsv | awk '{sum += $1} END {print sum}')
-                echo "Today's Azure cost: $COST"
-            '''
+            withCredentials([azureServicePrincipal('AZURE_CREDENTIALS')]) {
+                sh '''
+                    echo "Calculating Azure cost..."
+                    az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                    az account set --subscription $AZURE_SUBSCRIPTION_ID
+                    START_DATE=$(date -d "today" '+%Y-%m-%d')
+                    END_DATE=$(date -d "tomorrow" '+%Y-%m-%d')
+                    COST=$(az consumption usage list --start-date $START_DATE --end-date $END_DATE --query "[].{Cost:pretaxCost}" -o tsv | awk '{sum += $1} END {print sum}')
+                    echo "Today's Azure cost: $COST"
+                '''
+            }
             cleanWs()
         }
     }
