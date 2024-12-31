@@ -76,14 +76,7 @@ stage('Start Application') {
                     export CHROME_BIN=${CHROME_BIN}
                     export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
                     
-                    # Check if a process is running on port 3000 and kill it if it exists
-                    PORT_PID=$(lsof -t -i:3000 -sTCP:LISTEN || true)
-                    if [ ! -z "$PORT_PID" ]; then
-                        echo "Killing process on port 3000"
-                        kill -9 $PORT_PID || true
-                    fi
-                    
-                    # Start the application in the background
+                    # Start the application
                     npm start &
                     APP_PID=$!
                     echo "Application started with PID: $APP_PID"
@@ -99,6 +92,12 @@ stage('Start Application') {
                     done
                     
                     echo "Application failed to start within 60 seconds"
+                    echo "Checking Node.js processes:"
+                    ps aux | grep node
+                    echo "Checking port 3000 status:"
+                    lsof -i :3000 || echo "Port 3000 is still free"
+                    echo "Displaying npm start output:"
+                    cat npm-start.log
                     exit 1
                 '''
             } catch (Exception e) {
@@ -108,8 +107,7 @@ stage('Start Application') {
             }
         }
     }
-}
-		
+}	
 		stage('Run Unit Tests') {
 			steps {
 				// Run npm run test
