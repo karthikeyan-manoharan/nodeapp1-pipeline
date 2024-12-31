@@ -3,7 +3,7 @@ pipeline {
     environment {
         CHROME_VERSION = "131.0.6778.204-1"
         CHROMEDRIVER_VERSION = "131.0.6778.0"
-		
+        
         CHROME_BIN = "${WORKSPACE}/google-chrome"
         CHROMEDRIVER_DIR = "${WORKSPACE}/chromedriver"
         CHROMEDRIVER_BIN = "${CHROMEDRIVER_DIR}/chromedriver"
@@ -59,42 +59,62 @@ pipeline {
                 sh 'npm run build'
             }
         }
-        stage('Test') {
+        stage('Start Application') {
             steps {
                 sh '''
-					export CHROME_BIN=${CHROME_BIN}
-					export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
-					export PATH=$PATH:${CHROMEDRIVER_DIR}
-					echo "Chrome binary path: ${CHROME_BIN}"
-					echo "ChromeDriver binary path: ${CHROMEDRIVER_BIN}"
-					echo "PATH: $PATH"
-					echo "Chrome version:"
-					${CHROME_BIN} --version
-					echo "ChromeDriver version:"
-					${CHROMEDRIVER_BIN} --version
-					echo "Running tests..."
-					npm run test || (echo "Test failed. Printing error logs:"; find . -name "*.log" -type f -print0 | xargs -0 cat; exit 1)
-					npm run test:coverage
-					npm run test:all
+                    npm run build
+                    nohup npm start &
+                    echo $! > .pidfile
+                    sleep 10  # Give the app some time to start
                 '''
             }
         }
-		stage('Debug') {
-				steps {
-					sh '''
-						echo "Current directory contents:"
-						ls -la
-						echo "Node version:"
-						node --version
-						echo "NPM version:"
-						npm --version
-						echo "Selenium version:"
-						npm list selenium-webdriver
-						echo "ChromeDriver version in node_modules:"
-						npm list chromedriver
-					'''
-				}
-			}
+        stage('Test') {
+            steps {
+                sh '''
+                    export CHROME_BIN=${CHROME_BIN}
+                    export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
+                    export PATH=$PATH:${CHROMEDRIVER_DIR}
+                    echo "Chrome binary path: ${CHROME_BIN}"
+                    echo "ChromeDriver binary path: ${CHROMEDRIVER_BIN}"
+                    echo "PATH: $PATH"
+                    echo "Chrome version:"
+                    ${CHROME_BIN} --version
+                    echo "ChromeDriver version:"
+                    ${CHROMEDRIVER_BIN} --version
+                    echo "Running tests..."
+                    npm run test || (echo "Test failed. Printing error logs:"; find . -name "*.log" -type f -print0 | xargs -0 cat; exit 1)
+                    npm run test:coverage
+                    npm run test:all
+                '''
+            }
+        }
+        stage('Stop Application') {
+            steps {
+                sh '''
+                    if [ -f .pidfile ]; then
+                        kill $(cat .pidfile)
+                        rm .pidfile
+                    fi
+                '''
+            }
+        }
+        stage('Debug') {
+            steps {
+                sh '''
+                    echo "Current directory contents:"
+                    ls -la
+                    echo "Node version:"
+                    node --version
+                    echo "NPM version:"
+                    npm --version
+                    echo "Selenium version:"
+                    npm list selenium-webdriver
+                    echo "ChromeDriver version in node_modules:"
+                    npm list chromedriver
+                '''
+            }
+        }
         stage('Debug File Location') {
             steps {
                 sh '''
@@ -210,7 +230,6 @@ pipeline {
             }
         }
     }
-	
     post {
         always {
             withCredentials([azureServicePrincipal('azure-credentials')]) {
