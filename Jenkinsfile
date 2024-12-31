@@ -21,7 +21,8 @@ pipeline {
                 checkout scm
             }
         }
-       /*  stage('Install Chrome and ChromeDriver') {
+        
+        stage('Install Chrome and ChromeDriver') {
             steps {
                 sh '''
                     # Download and extract Chrome
@@ -42,7 +43,8 @@ pipeline {
                     ${CHROMEDRIVER_BIN} --version
                 '''
             }
-        } */
+        }
+        
         stage('Install Dependencies') {
             steps {
                 sh '''
@@ -51,34 +53,25 @@ pipeline {
                 '''
             }
         }
+        
         stage('Build') {
             steps {
                 sh 'npm run build'
             }
         }
-     /*   stage('Test') {
+        
+        stage('Test') {
             steps {
                 sh '''
                     export CHROME_BIN=${CHROME_BIN}
                     export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
-                    npm run test 
-                    npm run test:coverage 
+                    npm run test
+                    npm run test:coverage
                     npm run test:selenium
                 '''
             }
-        } */
-        stage('Debug File Location') {
-            steps {
-                sh '''
-                    echo "Current working directory:"
-                    pwd
-                    echo "Contents of current directory:"
-                    ls -la
-                    echo "Contents of dist directory (if it exists):"
-                    ls -la dist || echo "dist directory does not exist"
-                '''
-            }
         }
+        
         stage('Create Zip') {
             steps {
                 sh '''
@@ -90,12 +83,8 @@ pipeline {
                 '''
             }
         }
+        
         stage('Register Resource Providers') {
-            when {
-                expression {
-                     return sh(script: 'az provider show -n Microsoft.Web --query "registrationState" -o tsv', returnStdout: true).trim() != "Registered"
-                }
-            }
             steps {
                 withCredentials([azureServicePrincipal('azure-credentials')]) {
                     sh '''
@@ -107,84 +96,74 @@ pipeline {
                 }
             }
         }
-        stage('Create or Update Azure Resources') {
-            when {
-                branch 'develop'
-            }
-            steps {
+        
+stage('Create or Update Azure Resources') {
+    when {
+        branch 'develop'
+    }
+    steps {
+        withCredentials([azureServicePrincipal('azure-credentials')]) {
+            sh '''
+                az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                
+                # Create Resource Group if it doesn't exist
+                az group create --name ${AZURE_RESOURCE_GROUP} --location ${AZURE_LOCATION}
+                
+                # Create or update App Service Plan
+                az appservice plan create --name ${AZURE_APP_PLAN} --resource-group ${AZURE_RESOURCE_GROUP} --sku ${AZURE_APP_SKU} --is-linux
+                
+                # Create or update Web App
+                az webapp create --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --plan ${AZURE_APP_PLAN} --runtime "NODE|14-lts"
+                az webapp config appsettings set --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --settings WEBSITE_NODE_DEFAULT_VERSION=14-lts
+                az webapp config set --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --always-on true
+                az webapp log config --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --web-server-logging filesystem
+                
+                # Get and print the app URL
+                APP_URL=$(az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv)
+                echo "App URL: https://$APP_URL"
+                
+                # Print resource creation logs
+                az monitor activity-log list --resource-group ${AZURE_RESOURCE_GROUP} --start-time $(date -d "1 hour ago" -u +"%Y-%m-%dT%H:%M:%S") --query "[].{Operation:operationName.localizedValue, Status:status.localizedValue, Timestamp:eventTimestamp}" -o table
+            '''
+        }
+    }
+}
+
+stage('Deploy to Dev') {
+    when {
+        branch 'develop'
+    }
+    steps {
+        script {
+            echo "Current branch: ${env.BRANCH_NAME}"
+            echo "Starting deployment to Dev"
+            try {
                 withCredentials([azureServicePrincipal('azure-credentials')]) {
                     sh '''
+                        # Find the dist.zip file
+                        ZIP_PATH=$(find . -name dist.zip)
+                        if [ -z "$ZIP_PATH" ]; then
+                            echo "dist.zip not found"
+                            exit 1
+                        fi
+                        echo "dist.zip found at: $ZIP_PATH"
+                        # Azure CLI commands
                         az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-                        
-                        # Create Resource Group if it doesn't exist
-                        az group create --name ${AZURE_RESOURCE_GROUP} --location ${AZURE_LOCATION}
-                        
-                        # Create or update App Service Plan
-                        az appservice plan create --name ${AZURE_APP_PLAN} --resource-group ${AZURE_RESOURCE_GROUP} --sku ${AZURE_APP_SKU} --is-linux
-                        
-                        # Create or update Web App
-                        az webapp create --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --plan ${AZURE_APP_PLAN} --runtime "NODE|14-lts"
-                        az webapp config appsettings set --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --settings WEBSITE_NODE_DEFAULT_VERSION=14-lts
-                        az webapp config set --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --always-on true
-                        az webapp log config --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --web-server-logging filesystem
-                        
-                        # Get and print the app URL
-                        APP_URL=$(az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv)
+                        az webapp deploy --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_WEBAPP_NAME --src-path "$ZIP_PATH" --type zip
+                        APP_URL=$(az webapp show --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --query "defaultHostName" -o tsv)
                         echo "App URL: https://$APP_URL"
-                        
-                        # Print resource creation logs
-                        az monitor activity-log list --resource-group ${AZURE_RESOURCE_GROUP} --start-time $(date -d "1 hour ago" -u +"%Y-%m-%dT%H:%M:%S") --query "[].{Operation:operationName.localizedValue, Status:status.localizedValue, Timestamp:eventTimestamp}" -o table
                     '''
+                    env.DEPLOYMENT_SUCCESS = 'true'
+                    env.APP_URL = sh(script: 'az webapp show --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --query "defaultHostName" -o tsv', returnStdout: true).trim()
+                    echo "Deployment successful. APP_URL: ${env.APP_URL}"
                 }
+            } catch (Exception e) {
+                echo "Deployment failed: ${e.getMessage()}"
+                error "Deployment failed"
             }
         }
-        stage('Deploy to Dev') {
-            when {
-                branch 'develop'
-            }
-            steps {
-                script {
-                    echo "Current branch: ${env.BRANCH_NAME}"
-                    echo "Starting deployment to Dev"
-                    try {
-                        withCredentials([azureServicePrincipal('azure-credentials')]) {
-                            sh '''
-                                # Find the dist.zip file
-                                ZIP_PATH=$(find . -name dist.zip)
-                                if [ -z "$ZIP_PATH" ]; then
-                                    echo "dist.zip not found"
-                                    exit 1
-                                fi
-                                echo "dist.zip found at: $ZIP_PATH"
-
-                                # Azure CLI commands
-                                az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-
-                                az webapp deploy --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_WEBAPP_NAME --src-path "$ZIP_PATH" --type zip
-
-                                APP_URL=$(az webapp show --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --query "defaultHostName" -o tsv)
-                                echo "App URL: https://$APP_URL"
-                            '''
-                            env.DEPLOYMENT_SUCCESS = 'true'
-                            env.APP_URL = sh(script: 'az webapp show --name $AZURE_WEBAPP_NAME --resource-group $AZURE_RESOURCE_GROUP --query "defaultHostName" -o tsv', returnStdout: true).trim()
-                            echo "Deployment successful. APP_URL: ${env.APP_URL}"
-							
-                        }
-                    } catch (Exception e) {
-                        echo "Deployment failed: ${e.getMessage()}"
-                        error "Deployment failed"
-                    }
-                }
-            }
-        }
-       /* stage('Run Tests on Dev') {
-            when {
-                branch 'develop'
-            }
-            steps {
-                sh 'npm run test'
-            }
-        } */
+    }
+}
     }
     post {
         always {
