@@ -1,7 +1,7 @@
 import { Builder, By, until, WebDriver } from 'selenium-webdriver';
 import chrome from 'selenium-webdriver/chrome';
 
-const APP_URL = process.env.APP_URL || 'http://localhost:3000';
+const APP_URL = process.env.APP_URL || 'http://localhost:3001';
 
 describe('Selenium Test', () => {
   let driver: WebDriver;
