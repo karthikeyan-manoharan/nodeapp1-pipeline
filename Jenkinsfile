@@ -15,7 +15,6 @@ pipeline {
         
         GITHUB_REPO_URL = 'https://github.com/karthikeyan-manoharan/reactjs-express-typescript-app.git'
         
-	    // Add these new variables
         NODE_OPTIONS = '--max-old-space-size=4096'
         NPM_CONFIG_PREFIX = "${WORKSPACE}/.npm-global"
         PATH = "${WORKSPACE}/.npm-global/bin:${env.PATH}"
@@ -65,23 +64,14 @@ pipeline {
         
         stage('Install Dependencies') {
             steps {
-            //    sh '''
-            //        npm config set prefix "${NPM_CONFIG_PREFIX}"
-            //       npm install --no-fund
-            //       npm install --save-dev selenium-webdriver @types/selenium-webdriver
-            //       npm install -g concurrently wait-on
-            //   '''
-			
-				sh 'npm config set prefix /var/lib/jenkins/workspace/NodejsCIPipeline/.npm-global'
-				sh 'npm install --no-fund'
-				sh 'npm install --save-dev selenium-webdriver @types/selenium-webdriver'
-				sh 'npm install -g concurrently wait-on start-server-and-test'
+                sh 'npm config set prefix /var/lib/jenkins/workspace/NodejsCIPipeline/.npm-global'
+                sh 'npm install --no-fund'
+                sh 'npm install --save-dev selenium-webdriver @types/selenium-webdriver'
+                sh 'npm install -g concurrently wait-on start-server-and-test'
             }
         }
-		
-		
-		
-		stage('Run All Tests') {
+        
+        stage('Run All Tests') {
             steps {
                 script {
                     try {
@@ -98,58 +88,13 @@ pipeline {
                 }
             }
         }
-            /*
-        stage('Run Tests') {
-            parallel {
-                stage('Unit Tests') {
-                    steps {
-                        script {
-                            try {
-                                sh 'npm run test'
-                                echo "Unit tests passed"
-                            } catch (Exception e) {
-                                echo "Unit tests failed: ${e.getMessage()}"
-                                currentBuild.result = 'UNSTABLE'
-                            }
-                        }
-                    }
-                }
-                stage('Coverage Tests') {
-                    steps {
-                        script {
-                            try {
-                                sh 'npm run test:coverage'
-                                echo "Coverage tests passed"
-                            } catch (Exception e) {
-                                echo "Coverage tests failed: ${e.getMessage()}"
-                                currentBuild.result = 'UNSTABLE'
-                            }
-                        }
-                    }
-                }
-             stage('Selenium Tests') {
-                    steps {
-                        script {
-                            try {
-                                sh '''
-                                    set -x
-                                    export CHROME_BIN=${CHROME_BIN}
-                                    export CHROMEDRIVER_BIN=${CHROMEDRIVER_BIN}
-                                    concurrently --kill-others --success first "npm start" "wait-on http://localhost:3000 && jest tests/selenium.test.ts"
-                                '''
-                                echo "Selenium tests passed"
-                            } catch (Exception e) {
-                                echo "Selenium tests failed: ${e.getMessage()}"
-                                currentBuild.result = 'UNSTABLE'
-                            }
-                        }
-                    }
-                }  
-            } 
-         } */
+    
         stage('Deploy to Dev') {
             when {
-                branch 'develop'
+                anyOf {
+                    branch 'develop'
+                    branch 'origin/develop'
+                }
             }
             steps {
                 script {
@@ -189,10 +134,12 @@ pipeline {
                 }
             }
         }
-
         stage('Run Automated Tests on Dev') {
             when {
-                branch 'develop'
+                anyOf {
+                    branch 'develop'
+                    branch 'origin/develop'
+                }
                 expression { env.DEPLOYMENT_SUCCESS == 'true' }
             }
             steps {
@@ -214,10 +161,12 @@ pipeline {
                 }
             }
         }
-
         stage('Manual Testing Approval') {
             when {
-                branch 'develop'
+                anyOf {
+                    branch 'develop'
+                    branch 'origin/develop'
+                }
                 expression { env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true' }
             }
             steps {
@@ -234,7 +183,10 @@ pipeline {
         
         stage('Delete Azure Resources') {
             when {
-                branch 'develop'
+                anyOf {
+                    branch 'develop'
+                    branch 'origin/develop'
+                }
                 expression { env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true' }
             }
             steps {
