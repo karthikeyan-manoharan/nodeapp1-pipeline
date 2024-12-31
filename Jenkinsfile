@@ -20,12 +20,20 @@ pipeline {
         APP_PID = ''
     }
     stages {
+        stage('Debug Info') {
+            steps {
+                sh 'git branch --show-current'
+                sh 'echo $GIT_BRANCH'
+                sh 'echo $BRANCH_NAME'
+            }
+        }
+
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
-        
+		
         stage('Install Chrome and ChromeDriver') {
             steps {
                 sh '''
@@ -66,16 +74,32 @@ pipeline {
             }
         }
         
-        stage('Run Tests') {
+      stage('Run Tests') {
             parallel {
                 stage('Unit Tests') {
                     steps {
-                        sh 'npm run test || true'
+                        script {
+                            try {
+                                sh 'npm run test'
+                                echo "Unit tests passed"
+                            } catch (Exception e) {
+                                echo "Unit tests failed: ${e.getMessage()}"
+                                currentBuild.result = 'UNSTABLE'
+                            }
+                        }
                     }
                 }
                 stage('Coverage Tests') {
                     steps {
-                        sh 'npm run test:coverage || true'
+                        script {
+                            try {
+                                sh 'npm run test:coverage'
+                                echo "Coverage tests passed"
+                            } catch (Exception e) {
+                                echo "Coverage tests failed: ${e.getMessage()}"
+                                currentBuild.result = 'UNSTABLE'
+                            }
+                        }
                     }
                 }
                 stage('Selenium Tests') {
@@ -106,6 +130,7 @@ pipeline {
                                     kill $APP_PID
                                     exit $TEST_EXIT_CODE
                                 '''
+                                echo "Selenium tests passed"
                             } catch (Exception e) {
                                 echo "Selenium tests failed: ${e.getMessage()}"
                                 currentBuild.result = 'UNSTABLE'
@@ -115,12 +140,14 @@ pipeline {
                 }
             }
         }
+
         stage('Deploy to Dev') {
             when {
                 branch 'develop'
             }
             steps {
                 script {
+                    echo "Starting deployment to Dev"
                     try {
                         withCredentials([azureServicePrincipal('azure-credentials')]) {
                             sh '''
@@ -147,6 +174,7 @@ pipeline {
                             '''
                             env.DEPLOYMENT_SUCCESS = 'true'
                             env.APP_URL = sh(script: 'az webapp show --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --query "defaultHostName" -o tsv', returnStdout: true).trim()
+                            echo "Deployment successful. APP_URL: ${env.APP_URL}"
                         }
                     } catch (Exception e) {
                         echo "Deployment failed: ${e.getMessage()}"
@@ -155,6 +183,7 @@ pipeline {
                 }
             }
         }
+
         stage('Run Automated Tests on Dev') {
             when {
                 branch 'develop'
@@ -162,6 +191,7 @@ pipeline {
             }
             steps {
                 script {
+                    echo "Starting automated tests on Dev"
                     try {
                         sh """
                             export APP_URL=https://${env.APP_URL}
@@ -170,6 +200,7 @@ pipeline {
                             npm run test:selenium
                         """
                         env.TESTS_SUCCESS = 'true'
+                        echo "Automated tests on Dev passed"
                     } catch (Exception e) {
                         echo "Tests failed: ${e.getMessage()}"
                         error "Tests failed"
@@ -177,58 +208,61 @@ pipeline {
                 }
             }
         }
-			stage('Manual Testing Approval') {
-				when {
-					branch 'develop'
-					expression { env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true' }
-				}
-				steps {
-					script {
-						echo "Application is ready for manual testing at https://${env.APP_URL}"
-						echo "Please perform your manual tests and approve or reject the deployment."
-						
-						timeout(time: 24, unit: 'HOURS') {
-							input message: "Have you completed manual testing? (Application URL: https://${env.APP_URL})", ok: "Manual Testing Complete"
-						}
-					}
-				}
-			}
-			
-		stage('Delete Azure Resources') {
-		when {
-			branch 'develop'
-			expression { env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true' }
-		}
-		steps {
-			script {
-				try {
-					timeout(time: 1, unit: 'HOURS') {
-						input message: "Do you want to delete the Azure resources?", ok: "Yes, delete resources"
-					}
-					withCredentials([azureServicePrincipal('azure-credentials')]) {
-						sh '''
-							az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-							
-							# Delete the Web App
-							az webapp delete --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP}
-							
-							# Delete the App Service Plan
-							az appservice plan delete --name ${AZURE_APP_PLAN} --resource-group ${AZURE_RESOURCE_GROUP} --yes
-							
-							# Delete the Resource Group
-							az group delete --name ${AZURE_RESOURCE_GROUP} --yes --no-wait
-							
-							echo "Azure resources deletion initiated"
-						'''
-					}
-				} catch (Exception e) {
-					echo "Resource deletion skipped or failed: ${e.getMessage()}"
-				}
-			}
-		}
-	}
-		}
-		post {
+
+        stage('Manual Testing Approval') {
+            when {
+                branch 'develop'
+                expression { env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true' }
+            }
+            steps {
+                script {
+                    echo "Application is ready for manual testing at https://${env.APP_URL}"
+                    echo "Please perform your manual tests and approve or reject the deployment."
+                    
+                    timeout(time: 24, unit: 'HOURS') {
+                        input message: "Have you completed manual testing? (Application URL: https://${env.APP_URL})", ok: "Manual Testing Complete"
+                    }
+                }
+            }
+        }
+        
+        stage('Delete Azure Resources') {
+            when {
+                branch 'develop'
+                expression { env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'true' }
+            }
+            steps {
+                script {
+                    echo "Starting Azure resource deletion process"
+                    try {
+                        timeout(time: 1, unit: 'HOURS') {
+                            input message: "Do you want to delete the Azure resources?", ok: "Yes, delete resources"
+                        }
+                        withCredentials([azureServicePrincipal('azure-credentials')]) {
+                            sh '''
+                                az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+                                
+                                # Delete the Web App
+                                az webapp delete --name ${AZURE_WEBAPP_NAME} --resource-group ${AZURE_RESOURCE_GROUP}
+                                
+                                # Delete the App Service Plan
+                                az appservice plan delete --name ${AZURE_APP_PLAN} --resource-group ${AZURE_RESOURCE_GROUP} --yes
+                                
+                                # Delete the Resource Group
+                                az group delete --name ${AZURE_RESOURCE_GROUP} --yes --no-wait
+                                
+                                echo "Azure resources deletion initiated"
+                            '''
+                        }
+                    } catch (Exception e) {
+                        echo "Resource deletion skipped or failed: ${e.getMessage()}"
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
         failure {
             script {
                 if (env.DEPLOYMENT_SUCCESS == 'true' && env.TESTS_SUCCESS == 'false') {
