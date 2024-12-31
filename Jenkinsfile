@@ -170,7 +170,7 @@ stage('Create Zip') {
 
         stage('Register Resource Providers') {
             steps {
-                withCredentials([azureServicePrincipal('AZURE_CREDENTIALS')]) {
+                withCredentials([azureServicePrincipal('azure-credentials')]) {
                     sh '''
                         echo "Registering resource providers..."
                         az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
@@ -183,7 +183,7 @@ stage('Create Zip') {
 
         stage('Create or Update Azure Resources') {
             steps {
-                withCredentials([azureServicePrincipal('AZURE_CREDENTIALS')]) {
+                withCredentials([azureServicePrincipal('azure-credentials')]) {
                     sh '''
                         echo "Creating or updating Azure resources..."
                         az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
@@ -196,7 +196,7 @@ stage('Create Zip') {
 
         stage('Deploy to Dev') {
             steps {
-                withCredentials([azureServicePrincipal('AZURE_CREDENTIALS')]) {
+                withCredentials([azureServicePrincipal('azure-credentials')]) {
                     sh '''
                         echo "Deploying to Dev environment..."
                         az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
@@ -219,7 +219,7 @@ stage('Create Zip') {
 
     post {
         always {
-            withCredentials([azureServicePrincipal('AZURE_CREDENTIALS')]) {
+            withCredentials([azureServicePrincipal('azure-credentials')]) {
                 sh '''
                     echo "Calculating Azure cost..."
                     az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
